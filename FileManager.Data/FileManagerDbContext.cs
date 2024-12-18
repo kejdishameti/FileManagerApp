@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using FileManagerApp.Domain.Entities;
 using DomainFile = FileManagerApp.Domain.Entities.File;
+using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace FileManagerApp.Data
 {
@@ -36,7 +38,12 @@ namespace FileManagerApp.Data
 
                 // Store metadata as JSON
                 entity.Property(e => e.Metadata)
-                    .HasColumnType("jsonb");
+                    .HasColumnType("jsonb")
+                    .HasDefaultValueSql("'{}'::jsonb")
+                    .HasConversion(
+                        v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                        v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()) ?? new Dictionary<string, string>()
+                    );
             });
 
             // Configure the Folder entity

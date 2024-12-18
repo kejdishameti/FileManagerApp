@@ -29,8 +29,9 @@ namespace FileManagerApp.Data.Repositories
         public async Task<IEnumerable<DomainFile>> GetAllAsync()
         {
             return await _context.Files
-                .Where(f => !f.IsDeleted)
-                .ToListAsync();
+            .Where(f => !f.IsDeleted)
+            .AsNoTracking()  
+            .ToListAsync();
         }
 
         public async Task AddAsync(DomainFile entity)
