@@ -30,14 +30,41 @@ namespace FileManagerApp.API.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<FileDTO>>> GetFiles([FromQuery] int? folderId)
         {
-            IEnumerable<Domain.Entities.File> files;
+            try
+            {
+                IEnumerable<Domain.Entities.File> files;
 
-            if (folderId.HasValue)
-                files = await _unitOfWork.Files.GetFilesByFolderIdAsync(folderId.Value);
-            else
-                files = await _unitOfWork.Files.GetAllAsync();
+                if (folderId.HasValue)
+                {
+                    Console.WriteLine($"Fetching files for folder: {folderId}");
+                    files = await _unitOfWork.Files.GetFilesByFolderIdAsync(folderId.Value);
+                }
+                else
+                {
+                    Console.WriteLine("Fetching all files");
+                    files = await _unitOfWork.Files.GetAllAsync();
+                }
 
-            return Ok(_mapper.Map<IEnumerable<FileDTO>>(files));
+                var response = files.Select(f => new FileDTO
+                {
+                    Id = f.Id,
+                    Name = f.Name,
+                    ContentType = f.ContentType,
+                    SizeInBytes = f.SizeInBytes,
+                    CreatedAt = f.CreatedAt,
+                    FolderId = f.FolderId,
+                    Metadata = new Dictionary<string, string>(f.Metadata ?? new Dictionary<string, string>())
+                }).ToList();
+
+                Console.WriteLine($"Successfully retrieved {response.Count} files");
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error retrieving files: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                return StatusCode(500, "An error occurred while retrieving files");
+            }
         }
 
         // POST: api/files/upload
@@ -47,52 +74,116 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
+                // Get the uploaded file and log initial request details
                 var file = createFileDto.File;
+                Console.WriteLine($"Starting upload request - File: {file?.FileName}, FolderId: {createFileDto.FolderId}");
 
-                // Validate the file
+                // Validate the incoming file
                 if (file == null || file.Length == 0)
-                    return BadRequest("No file was provided");
+                    return BadRequest("No file was provided or file is empty");
 
                 if (file.Length > _maxFileSize)
                     return BadRequest($"File size exceeds the limit of {_maxFileSize / 1024 / 1024}MB");
 
                 if (!_allowedTypes.Contains(file.ContentType))
-                    return BadRequest("File type not allowed");
+                    return BadRequest($"File type {file.ContentType} is not allowed");
 
-                // Generate a unique filename to prevent conflicts
+                // If a folder ID is provided, verify the folder exists
+                if (createFileDto.FolderId.HasValue)
+                {
+                    var folder = await _unitOfWork.Folders.GetByIdAsync(createFileDto.FolderId.Value);
+                    Console.WriteLine($"Folder lookup result: {(folder != null ? "Found" : "Not Found")} for ID {createFileDto.FolderId.Value}");
+
+                    if (folder == null)
+                        return BadRequest($"Folder with ID {createFileDto.FolderId.Value} not found");
+                }
+
+                // Prepare the file storage location
                 string uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
                 string filePath = Path.Combine(_storageBasePath, uniqueFileName);
 
-                // Ensure storage directory exists
-                Directory.CreateDirectory(_storageBasePath);
-
-                // Save the physical file using a stream to handle large files efficiently
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                // Ensure the storage directory exists
+                if (!Directory.Exists(_storageBasePath))
                 {
-                    await file.CopyToAsync(stream);
+                    Console.WriteLine($"Creating storage directory: {_storageBasePath}");
+                    Directory.CreateDirectory(_storageBasePath);
                 }
 
-                // Create and save file metadata
-                var fileEntity = Domain.Entities.File.Create(
-                    file.FileName,
-                    file.ContentType,
-                    file.Length,
-                    filePath
-                );
-
-                if (createFileDto.FolderId.HasValue)
+                try
                 {
-                    fileEntity.MoveToFolder(createFileDto.FolderId);
+                    // Save the physical file
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await file.CopyToAsync(stream);
+                    }
+                    Console.WriteLine($"Physical file saved successfully to: {filePath}");
+
+                    // Create the file entity with initial metadata
+                    var fileEntity = Domain.Entities.File.Create(
+                        file.FileName,
+                        file.ContentType,
+                        file.Length,
+                        filePath
+                    );
+
+                    Console.WriteLine($"File entity created - Initial state - ID: {fileEntity.Id}, FolderId: {fileEntity.FolderId}");
+
+                    // Set the folder if specified
+                    if (createFileDto.FolderId.HasValue)
+                    {
+                        fileEntity.MoveToFolder(createFileDto.FolderId);
+                        Console.WriteLine($"After MoveToFolder - FolderId: {fileEntity.FolderId}");
+                    }
+
+                    // Add metadata if provided
+                    if (createFileDto.Metadata != null && createFileDto.Metadata.Count > 0)
+                    {
+                        foreach (var item in createFileDto.Metadata)
+                        {
+                            fileEntity.AddMetadata(item.Key, item.Value);
+                        }
+                        Console.WriteLine($"Added {createFileDto.Metadata.Count} metadata items");
+                    }
+
+                    // Save to database
+                    Console.WriteLine($"Before database save - FolderId: {fileEntity.FolderId}");
+                    await _unitOfWork.Files.AddAsync(fileEntity);
+                    await _unitOfWork.SaveChangesAsync();
+                    Console.WriteLine($"After database save - FolderId: {fileEntity.FolderId}");
+
+                    // Prepare and return response
+                    var response = new FileUploadResponseDTO
+                    {
+                        Id = fileEntity.Id,
+                        Name = fileEntity.Name,
+                        ContentType = fileEntity.ContentType,
+                        SizeInBytes = fileEntity.SizeInBytes,
+                        UploadedAt = fileEntity.CreatedAt,
+                        FolderId = fileEntity.FolderId,
+                        Metadata = new Dictionary<string, string>(fileEntity.Metadata)
+                    };
+
+                    Console.WriteLine($"Upload completed successfully - File ID: {response.Id}, FolderId: {response.FolderId}");
+                    return Ok(response);
                 }
+                catch (Exception ex)
+                {
+                    // If anything fails after the physical file is created, clean it up
+                    if (System.IO.File.Exists(filePath))
+                    {
+                        System.IO.File.Delete(filePath);
+                        Console.WriteLine($"Cleaned up physical file after error: {filePath}");
+                    }
 
-                await _unitOfWork.Files.AddAsync(fileEntity);
-                await _unitOfWork.SaveChangesAsync();
-
-                return Ok(_mapper.Map<FileUploadResponseDTO>(fileEntity));
+                    Console.WriteLine($"Error during file processing: {ex.Message}");
+                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                    throw;
+                }
             }
             catch (Exception ex)
             {
-                // Log the error here
+                Console.WriteLine($"Upload failed with error: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 return StatusCode(500, "An error occurred while uploading the file");
             }
         }

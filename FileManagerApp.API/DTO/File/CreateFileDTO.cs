@@ -4,6 +4,6 @@
     {
         public IFormFile File { get; set; }
         public int? FolderId { get; set; }
-        public Dictionary<string, string> Metadata { get; set; }
+        public Dictionary<string, string> Metadata { get; set; } = new();
     }
 }

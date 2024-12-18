@@ -6,6 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using AutoMapper;
 using FileManagerApp.API.Helpers;
 using System.Reflection;
+using Npgsql;
+
 
 namespace FileManagerApp.API
 {
@@ -19,6 +21,8 @@ namespace FileManagerApp.API
             builder.Services.AddDbContext<FileManagerDbContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+            NpgsqlConnection.GlobalTypeMapper.UseJsonNet();
 
             // Register our data layer services using the extension method we created
             builder.Services.AddDataLayer();
