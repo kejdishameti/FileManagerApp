@@ -38,15 +38,19 @@ namespace FileManagerApp.Domain.Entities
         public virtual Folder Folder { get; private set; }
 
         // Method to move the file to a different folder
-        public void MoveToFolder(int? FolderId)
+        public void MoveToFolder(int? folderId)
         {
-            FolderId = FolderId;
+            FolderId = folderId;
             ModifiedAt = DateTime.UtcNow;
         }
 
         // Additional file information stored as key-value pairs
         private Dictionary<string, string> _metadata = new();
-        public IReadOnlyDictionary<string, string> Metadata => _metadata;
+        public Dictionary<string, string> Metadata
+        {
+            get => _metadata;
+            private set => _metadata = value ?? new Dictionary<string, string>();
+        }
 
 
         // Private constructor for Entity Framework
@@ -57,16 +61,25 @@ namespace FileManagerApp.Domain.Entities
             if (string.IsNullOrEmpty(name))
                 throw new ArgumentException("File must have a name");
 
-            return new File
+            var file = new File
             {
                 Name = name,
                 ContentType = contentType,
                 SizeInBytes = sizeInBytes,
                 StoragePath = storagePath,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
                 //Status = FileStatus.Processing  // New files start in Processing status
             };
+            
+            return file;
+            
         }
+
+        //public void MoveToFolder(int? folderId)
+        //{
+        //    FolderId = folderId;
+        //    ModifiedAt = DateTime.UtcNow;
+        //}
 
         // Methods to change the file's status
         public void MarkAsActive()

@@ -20,8 +20,14 @@ namespace FileManagerApp.Domain.Entities
 
         [Required]
         [PathValidation]
-        public string Path { get; private set; }
+        public string Path { get; internal set; }
 
+        public void SetPath(string parentPath = "")
+        {
+            Path = string.IsNullOrEmpty(parentPath)
+                ? "/" + Name
+                : parentPath + "/" + Name;
+        }
         // Timestamps
         public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
         public DateTime? ModifiedAt { get; private set; }
@@ -45,15 +51,19 @@ namespace FileManagerApp.Domain.Entities
         private Folder() { }
 
         // Method to create a new folder
-        public static Folder Create(string name, int ? parentFolderId = null)
+        public static Folder Create(string name, int? parentFolderId = null)
         {
             if (string.IsNullOrEmpty(name))
                 throw new ArgumentException("Folder must have a name");
+
+            // Initial path
+            string path = "/" + name;
 
             return new Folder
             {
                 Name = name,
                 ParentFolderId = parentFolderId,
+                Path = path,
                 CreatedAt = DateTime.UtcNow
             };
         }
