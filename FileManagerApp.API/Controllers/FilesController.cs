@@ -249,7 +249,7 @@ namespace FileManagerApp.API.Controllers
             if (!System.IO.File.Exists(file.StoragePath))
                 return NotFound("Physical file is missing");
 
-            // Stream the file instead of loading it all into memory
+            // Stream the file 
             var fileStream = System.IO.File.OpenRead(file.StoragePath);
             return File(fileStream, file.ContentType, file.Name);
         }
@@ -275,7 +275,7 @@ namespace FileManagerApp.API.Controllers
             file.MoveToFolder(moveFileDto.NewFolderId);
             _unitOfWork.Files.Update(file);
             await _unitOfWork.SaveChangesAsync();
-
+            
             return NoContent();
         }
     }

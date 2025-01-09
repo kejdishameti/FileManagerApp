@@ -1,5 +1,6 @@
 using FileManagerApp.API.Helpers;
 using FileManagerApp.Data;
+using FileManagerApp.Service;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +27,7 @@ namespace FileManagerApp.API
 
             // Register our data layer services using the extension method we created
             builder.Services.AddDataLayer();
+            builder.Services.AddServiceLayer();
 
             // Add AutoMapper
             builder.Services.AddAutoMapper(Assembly.GetEntryAssembly());

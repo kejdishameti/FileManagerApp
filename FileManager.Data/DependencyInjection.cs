@@ -22,7 +22,7 @@ namespace FileManagerApp.Data
 
             // Add the unit of work
             services.AddScoped<IUnitOfWork, UnitOfWork.UnitOfWork>();
-
+   
             return services;
         }
     }
