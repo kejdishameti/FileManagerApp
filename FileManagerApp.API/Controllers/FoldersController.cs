@@ -110,6 +110,67 @@ namespace FileManagerApp.API.Controllers
             return NoContent();
         }
 
+        
+        [HttpPut("{id}/move")]
+        public async Task<IActionResult> MoveFolder(int id, [FromBody] MoveFolderDTO moveFolderDto)
+        {
+            try
+            {
+                // Get the folder we want to move
+                var folder = await _unitOfWork.Folders.GetByIdAsync(id);
+                if (folder == null)
+                    return NotFound($"Folder with ID {id} not found");
+
+                if (moveFolderDto.NewParentFolderId.HasValue)
+                {
+                    var targetFolder = await _unitOfWork.Folders.GetByIdAsync(moveFolderDto.NewParentFolderId.Value);
+                    if (targetFolder == null)
+                        return BadRequest("Target parent folder not found");
+
+                    // Prevent moving a folder into itself or its children
+                    if (await IsFolderCircularReference(id, moveFolderDto.NewParentFolderId.Value))
+                        return BadRequest("Cannot move a folder into itself or its children");
+                }
+
+                // Update the folder's parent and path
+                folder.UpdateParentFolder(moveFolderDto.NewParentFolderId);
+
+                // Get the new parent's path (if any) to update this folder's path
+                string parentPath = "";
+                if (moveFolderDto.NewParentFolderId.HasValue)
+                {
+                    var parentFolder = await _unitOfWork.Folders.GetByIdAsync(moveFolderDto.NewParentFolderId.Value);
+                    parentPath = parentFolder.Path;
+                }
+                folder.SetPath(parentPath);
+
+                _unitOfWork.Folders.Update(folder);
+                await _unitOfWork.SaveChangesAsync();
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "An error occurred while moving the folder");
+            }
+        }
+
+        private async Task<bool> IsFolderCircularReference(int sourceId, int targetParentId)
+        {
+            var currentFolder = await _unitOfWork.Folders.GetByIdAsync(targetParentId);
+            while (currentFolder != null)
+            {
+                if (currentFolder.Id == sourceId)
+                    return true;
+
+                if (!currentFolder.ParentFolderId.HasValue)
+                    break;
+
+                currentFolder = await _unitOfWork.Folders.GetByIdAsync(currentFolder.ParentFolderId.Value);
+            }
+            return false;
+        }
+
         // Get api/folders/{id}/children
         // Retrives all children of a folder
         [HttpGet("{id}/children")]

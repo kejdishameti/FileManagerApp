@@ -2,6 +2,6 @@
 {
     public class MoveFolderDTO
     {
-        public int? ParentFolderId { get; set; }
+        public int? NewParentFolderId { get; set; }
     }
 }
