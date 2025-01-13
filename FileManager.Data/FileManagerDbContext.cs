@@ -69,7 +69,7 @@ namespace FileManagerApp.Data
                 entity.ToTable("Users");
                 entity.HasKey(e => e.Id);
 
-                // Email must be unique
+
                 entity.HasIndex(e => e.Email)
                     .IsUnique();
 

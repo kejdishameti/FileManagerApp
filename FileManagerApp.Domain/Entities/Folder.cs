@@ -94,5 +94,11 @@ namespace FileManagerApp.Domain.Entities
             IsDeleted = true;
             DeletedAt = DateTime.UtcNow;
         }
+
+        public void UpdateParentFolder(int? newParentFolderId)
+        {
+            ParentFolderId = newParentFolderId;
+            ModifiedAt = DateTime.UtcNow;
+        }
     }
 }
