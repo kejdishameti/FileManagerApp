@@ -12,6 +12,7 @@ namespace FileManagerApp.Data.UnitOfWork
         // Properties to access repositories
         IFileRepository Files { get; }
         IFolderRepository Folders { get; }
+        IUserRepository Users { get; }
 
         // Method to save changes
         Task<int> SaveChangesAsync();

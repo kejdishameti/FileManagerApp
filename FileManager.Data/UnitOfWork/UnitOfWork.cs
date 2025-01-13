@@ -6,18 +6,15 @@ using System.Threading.Tasks;
 using FileManagerApp.Data.Interfaces;
 using FileManagerApp.Data.Repositories;
 
+
 namespace FileManagerApp.Data.UnitOfWork
 {
     public class UnitOfWork : IUnitOfWork
     {
-        // Database context that will be shared across repositories
         private readonly FileManagerDbContext _context;
-
-        // Repository instances
         private IFileRepository _filesRepository;
         private IFolderRepository _foldersRepository;
-
-        // Track whether Dispose has been called
+        private IUserRepository _usersRepository;
         private bool _disposed;
 
         public UnitOfWork(FileManagerDbContext context)
@@ -25,40 +22,33 @@ namespace FileManagerApp.Data.UnitOfWork
             _context = context;
         }
 
-        // Lazy loading of repositories (only create them when first accessed)
-        public IFileRepository Files
-        {
-            get { return _filesRepository ??= new FileRepository(_context); }
-        }
-        
-        public IFolderRepository Folders
-        {
-            get { return _foldersRepository ??= new FolderRepository(_context); }
-        }
+        // Add Users property alongside existing repositories
+        public IFileRepository Files =>
+            _filesRepository ??= new FileRepository(_context);
 
-        // Method to save changes
+        public IFolderRepository Folders =>
+            _foldersRepository ??= new FolderRepository(_context);
+
+        public IUserRepository Users =>
+            _usersRepository ??= new UserRepository(_context);
+
+        // Existing SaveChanges and Dispose methods remain the same
         public async Task<int> SaveChangesAsync()
         {
             try
             {
-                // Attempt to save changes at once
                 return await _context.SaveChangesAsync();
             }
-
             catch (Exception ex)
             {
-                // Log the exception
                 throw new Exception("Error occurred while saving changes", ex);
-                
             }
         }
 
-        // Implementation of IDisposable
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposed && disposing)
             {
-                // Dispose managed resources
                 _context.Dispose();
             }
             _disposed = true;

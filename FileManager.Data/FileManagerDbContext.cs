@@ -21,6 +21,7 @@ namespace FileManagerApp.Data
 
         public DbSet<DomainFile> Files { get; set; }
         public DbSet<Folder> Folders { get; set; }
+        public DbSet<User> Users { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -60,6 +61,30 @@ namespace FileManagerApp.Data
 
                 entity.HasIndex(e => e.Path)
                     .IsUnique();
+            });
+
+            // Configure the User entity
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.ToTable("Users");
+                entity.HasKey(e => e.Id);
+
+                // Email must be unique
+                entity.HasIndex(e => e.Email)
+                    .IsUnique();
+
+                // Configure property requirements
+                entity.Property(e => e.Email)
+                    .IsRequired()
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.Username)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.Role)
+                    .IsRequired()
+                    .HasMaxLength(50);
             });
         }
     }
