@@ -179,5 +179,47 @@ namespace FileManagerApp.API.Controllers
             var childFolders = await _unitOfWork.Folders.GetChildFoldersByParentIdAsync(id);
             return Ok(_mapper.Map<IEnumerable<FolderDTO>>(childFolders));
         }
+
+        // Get api/folders/tree
+        // Retrives the folder structure as a tree
+        [HttpGet("tree")]
+        public async Task<ActionResult<IEnumerable<FolderTreeDTO>>> GetFolderTree()
+        {
+            try
+            {
+                // First, get all folders
+                var allFolders = await _unitOfWork.Folders.GetAllAsync();
+
+                // Start with root folders (those without a parent)
+                var rootFolders = allFolders.Where(f => !f.ParentFolderId.HasValue).ToList();
+
+                // Build tree starting from root folders
+                var treeView = rootFolders.Select(folder => BuildFolderTree(folder, allFolders)).ToList();
+
+                return Ok(treeView);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "An error occurred while retrieving the folder structure");
+            }
+        }
+
+        // Helper method to build the tree structure recursively
+        private FolderTreeDTO BuildFolderTree(Folder folder, IEnumerable<Folder> allFolders)
+        {
+            // Find all children of current folder
+            var children = allFolders
+                .Where(f => f.ParentFolderId == folder.Id)
+                .Select(childFolder => BuildFolderTree(childFolder, allFolders))
+                .ToList();
+
+            // Create the DTO with folder info and its children
+            return new FolderTreeDTO
+            {
+                Id = folder.Id,
+                Name = folder.Name,
+                Children = children
+            };
+        }
     }
 }
