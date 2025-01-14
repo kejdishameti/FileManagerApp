@@ -8,7 +8,7 @@ namespace FileManagerApp.API.Helpers
 {
     public class MappingProfiles : Profile
     {
-            public MappingProfiles()
+         public MappingProfiles()
             {
                 // File mappings
                 CreateMap<DomainFile, FileDTO>();
