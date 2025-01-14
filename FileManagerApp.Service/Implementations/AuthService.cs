@@ -77,7 +77,7 @@ namespace FileManagerApp.Service.Implementations
             var key = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(_config["TokenKey"]));
 
-            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
+            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
