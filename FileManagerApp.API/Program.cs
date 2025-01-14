@@ -13,6 +13,7 @@ using System.Text;
 using FileManagerApp.Service.Interfaces;
 using FileManagerApp.Service.Implementations;
 using FileManagerApp.Service.Mappings;
+using Microsoft.OpenApi.Models;
 
 
 namespace FileManagerApp.API
@@ -38,27 +39,60 @@ namespace FileManagerApp.API
             builder.Services.AddServiceLayer();
 
             // Add AutoMapper
-            builder.Services.AddAutoMapper(typeof(Program).Assembly);
-
+            builder.Services.AddAutoMapper(typeof(Program).Assembly,
+                typeof(FileManagerApp.Service.Mappings.MappingProfiles).Assembly);
             // Add Authentication and JWT configuration
             builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
-                {
-                    var tokenKey = builder.Configuration["TokenKey"];
-                    if (string.IsNullOrEmpty(tokenKey))
-                    {
-                        throw new InvalidOperationException("TokenKey is not configured in appsettings.json");
-                    }
+             {
+                  var tokenKey = builder.Configuration["TokenKey"];
+                   if (string.IsNullOrEmpty(tokenKey))
+                  {
+                      throw new InvalidOperationException("TokenKey is not configured in appsettings.json");
+                  }
 
-                    options.TokenValidationParameters = new TokenValidationParameters
-                    {
-                        ValidateIssuerSigningKey = true,
-                        IssuerSigningKey = new SymmetricSecurityKey(
-                            Encoding.UTF8.GetBytes(tokenKey)),
-                        ValidateIssuer = false,
-                        ValidateAudience = false
-                    };
+                  // Create the security key
+                  var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(tokenKey));
+
+                  options.TokenValidationParameters = new TokenValidationParameters
+                  {
+                      ValidateIssuerSigningKey = true,
+                      IssuerSigningKey = key,
+                      ValidateIssuer = false,
+                      ValidateAudience = false
+                  };
+              });
+
+            builder.Services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo { Title = "File Manager API", Version = "v1" });
+
+                // Add JWT Authentication
+                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Description = "JWT Authorization header using the Bearer scheme. Example: 'Bearer {token}'",
+                    Name = "Authorization",
+                    In = ParameterLocation.Header,
+                    Type = SecuritySchemeType.ApiKey,
+                    Scheme = "Bearer"
                 });
+
+                c.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        Array.Empty<string>()
+                    }
+                });
+            });
+
 
             // Add controllers
             builder.Services.AddControllers();
