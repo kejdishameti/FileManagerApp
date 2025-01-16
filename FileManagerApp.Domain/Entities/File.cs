@@ -53,6 +53,35 @@ namespace FileManagerApp.Domain.Entities
         }
 
 
+        public void AddOrUpdateMetadata(string key, string value)
+        {
+            var normalizedKey = key.Trim().ToLower();
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                _metadata.Remove(normalizedKey);
+                return;
+            }
+            
+            _metadata[normalizedKey] = value.Trim();
+            ModifiedAt = DateTime.UtcNow;
+        }
+
+        public string GetMetadataValue(string key)
+        {
+            var normalizedKey = key.Trim().ToLower();
+            return _metadata.TryGetValue(normalizedKey, out var value) ? value : null;
+        }
+
+        public void RemoveMetadata(string key)
+        {
+            var normalizedKey = key.Trim().ToLower();
+            if (_metadata.Remove(normalizedKey))
+            {
+                ModifiedAt = DateTime.UtcNow;
+            }
+        }
+
         // Private constructor for Entity Framework
         private File() { }
 
@@ -68,18 +97,12 @@ namespace FileManagerApp.Domain.Entities
                 SizeInBytes = sizeInBytes,
                 StoragePath = storagePath,
                 CreatedAt = DateTime.UtcNow,
-                //Status = FileStatus.Processing  // New files start in Processing status
+                Status = FileStatus.Processing
             };
             
             return file;
             
         }
-
-        //public void MoveToFolder(int? folderId)
-        //{
-        //    FolderId = folderId;
-        //    ModifiedAt = DateTime.UtcNow;
-        //}
 
         // Methods to change the file's status
         public void MarkAsActive()
@@ -98,16 +121,6 @@ namespace FileManagerApp.Domain.Entities
         {
             IsDeleted = true;
             DeletedAt = DateTime.UtcNow;
-        }
-
-        // Method to add extra information about the file
-        public void AddMetadata(string key, string value)
-        {
-            if (string.IsNullOrEmpty(key))
-                throw new ArgumentException("Metadata key cannot be empty");
-
-            _metadata[key] = value;
-            ModifiedAt = DateTime.UtcNow;
         }
     }
 }

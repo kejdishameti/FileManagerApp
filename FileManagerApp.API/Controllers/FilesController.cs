@@ -140,7 +140,7 @@ namespace FileManagerApp.API.Controllers
                     {
                         foreach (var item in createFileDto.Metadata)
                         {
-                            fileEntity.AddMetadata(item.Key, item.Value);
+                            fileEntity.AddOrUpdateMetadata(item.Key, item.Value);
                         }
                         Console.WriteLine($"Added {createFileDto.Metadata.Count} metadata items");
                     }
@@ -217,6 +217,48 @@ namespace FileManagerApp.API.Controllers
             await _unitOfWork.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // Put api/files/{id}/metadata
+        // Updates the file metadata
+        [HttpPut("{id}/metadata")]
+        public async Task<IActionResult> UpdateFileMetadata(int id, [FromBody] UpdateFileMetadataDTO metadataDto)
+        {
+            try
+            {
+                var file = await _unitOfWork.Files.GetByIdAsync(id);
+                if (file == null)
+                    return NotFound($"File with ID {id} not found");
+
+                Console.WriteLine($"Updating metadata for file {id} - {file.Name}");
+
+                foreach (var item in metadataDto.Metadata)
+                {
+                    file.AddOrUpdateMetadata(item.Key, item.Value);
+                    Console.WriteLine($"Added/Updated metadata: {item.Key} = {item.Value}");
+                }
+
+                _unitOfWork.Files.Update(file);
+                await _unitOfWork.SaveChangesAsync();
+
+                var response = new FileDTO
+                {
+                    Id = file.Id,
+                    Name = file.Name,
+                    ContentType = file.ContentType,
+                    SizeInBytes = file.SizeInBytes,
+                    CreatedAt = file.CreatedAt,
+                    FolderId = file.FolderId,
+                    Metadata = new Dictionary<string, string>(file.Metadata)
+                };
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating file metadata: {ex.Message}");
+                return StatusCode(500, "An error occurred while updating file metadata");
+            }
         }
 
 

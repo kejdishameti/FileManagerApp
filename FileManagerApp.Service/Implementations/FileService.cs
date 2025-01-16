@@ -98,7 +98,7 @@ namespace FileManagerApp.Service.Implementations
                 {
                     foreach (var item in metadata)
                     {
-                        fileEntity.AddMetadata(item.Key, item.Value);
+                        fileEntity.AddOrUpdateMetadata(item.Key, item.Value);
                     }
                 }
 
@@ -137,7 +137,7 @@ namespace FileManagerApp.Service.Implementations
             {
                 foreach (var item in metadata)
                 {
-                    file.AddMetadata(item.Key, item.Value);
+                    file.AddOrUpdateMetadata(item.Key, item.Value);
                 }
             }
 
