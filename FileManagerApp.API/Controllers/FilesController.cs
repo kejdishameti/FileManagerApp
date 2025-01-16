@@ -236,6 +236,37 @@ namespace FileManagerApp.API.Controllers
             return NoContent();
         }
 
+        // Post api/files/batch-delete
+        // Soft delete multiple files
+        [HttpPost("batch-delete")]
+        public async Task<IActionResult> BatchDeleteFiles([FromBody] BatchDeleteFilesDTO deleteDto)
+        {
+            try
+            {
+                if (deleteDto.FileIds == null || !deleteDto.FileIds.Any())
+                {
+                    return BadRequest("No file IDs provided for deletion");
+                }
+
+                Console.WriteLine($"Starting batch deletion of {deleteDto.FileIds.Count} files");
+
+                await _unitOfWork.Files.BatchDeleteAsync(deleteDto.FileIds);
+
+                await _unitOfWork.SaveChangesAsync();
+
+                Console.WriteLine("Batch deletion completed successfully");
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error during batch deletion: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+
+                return StatusCode(500, "An error occurred while deleting files");
+            }
+        }
+
         // Get api/files/{id}/download
         // Downloads the file with the specified ID
         [HttpGet("{id}/download")]

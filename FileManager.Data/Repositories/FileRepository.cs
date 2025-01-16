@@ -50,6 +50,19 @@ namespace FileManagerApp.Data.Repositories
             _context.Files.Update(entity);
         }
 
+        public async Task BatchDeleteAsync(IEnumerable<int> fileIds)
+        {
+            var filesToDelete = await _context.Files
+                .Where(f => fileIds.Contains(f.Id) && !f.IsDeleted)
+                .ToListAsync();
+
+            foreach (var file in filesToDelete)
+            {
+                file.MarkAsDeleted();
+                _context.Files.Update(file);
+            }
+        }
+
         public async Task<IEnumerable<DomainFile>> GetFilesByFolderIdAsync(int folderId)
         {
             return await _context.Files
