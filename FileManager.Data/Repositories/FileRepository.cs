@@ -62,5 +62,38 @@ namespace FileManagerApp.Data.Repositories
             return await _context.Files
                 .FirstOrDefaultAsync(f => f.StoragePath == path && !f.IsDeleted);
         }
+
+        public async Task<IEnumerable<DomainFile>> SearchFilesAsync(string searchTerm)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(searchTerm))
+                    return new List<DomainFile>();
+
+                searchTerm = searchTerm.ToLower();
+
+                var files = await _context.Files
+                    .Where(f => !f.IsDeleted &&
+                               f.Name.ToLower().Contains(searchTerm))
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                var metadataMatches = await _context.Files
+                    .Where(f => !f.IsDeleted)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                var filesWithMetadataMatch = metadataMatches
+                    .Where(f => f.Metadata != null &&
+                               f.Metadata.Any(m => m.Value?.ToLower().Contains(searchTerm) ?? false));
+
+                return files.Union(filesWithMetadataMatch);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Database error in SearchFilesAsync: {ex.Message}");
+                throw;
+            }
+        }
     }
 }

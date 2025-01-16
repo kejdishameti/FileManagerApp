@@ -278,5 +278,54 @@ namespace FileManagerApp.API.Controllers
             
             return NoContent();
         }
+
+        // Get api/files/search
+        // Searches files by name or metadata
+        [HttpGet("search")]
+        public async Task<ActionResult<IEnumerable<FileDTO>>> SearchFiles([FromQuery] string term)
+        {
+            try
+            {
+                // Log the start of the search operation
+                Console.WriteLine($"Starting search operation with term: {term}");
+
+                if (string.IsNullOrWhiteSpace(term))
+                    return BadRequest("Search term cannot be empty");
+
+                // Log before calling the repository
+                Console.WriteLine("Calling repository SearchFilesAsync method");
+                var files = await _unitOfWork.Files.SearchFilesAsync(term);
+                Console.WriteLine($"Repository returned {files?.Count() ?? 0} files");
+
+                // Log the mapping operation
+                Console.WriteLine("Starting to map files to DTOs");
+                var response = files.Select(f => new FileDTO
+                {
+                    Id = f.Id,
+                    Name = f.Name,
+                    ContentType = f.ContentType,
+                    SizeInBytes = f.SizeInBytes,
+                    CreatedAt = f.CreatedAt,
+                    FolderId = f.FolderId,
+                    Metadata = new Dictionary<string, string>(f.Metadata ?? new Dictionary<string, string>())
+                }).ToList();
+                Console.WriteLine($"Successfully mapped {response.Count} files to DTOs");
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                // Enhanced error logging
+                Console.WriteLine($"Error details:");
+                Console.WriteLine($"Message: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                    Console.WriteLine($"Inner exception stack trace: {ex.InnerException.StackTrace}");
+                }
+                return StatusCode(500, "An error occurred while searching files");
+            }
+        }
     }
 }

@@ -22,6 +22,7 @@ namespace FileManagerApp.Data.Interfaces
     {
         Task<IEnumerable<DomainFile>> GetFilesByFolderIdAsync(int folderId);
         Task<DomainFile> GetFileByPathAsync(string path);
+        Task<IEnumerable<DomainFile>> SearchFilesAsync(string searchTerm);
     }
 
     public interface IFolderRepository : IRepository<Folder>
