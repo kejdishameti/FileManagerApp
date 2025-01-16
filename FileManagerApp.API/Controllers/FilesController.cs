@@ -202,7 +202,7 @@ namespace FileManagerApp.API.Controllers
         }
 
         // Put api/files/{id}
-        // Updates the file metadata
+        // Updates the file's properties 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateFile(int id, UpdateFileDTO updateFileDto)
         {
@@ -212,7 +212,6 @@ namespace FileManagerApp.API.Controllers
                 return NotFound($"File with ID {id} not found");
 
             _mapper.Map(updateFileDto, file);
-
             _unitOfWork.Files.Update(file);
             await _unitOfWork.SaveChangesAsync();
 
@@ -220,7 +219,7 @@ namespace FileManagerApp.API.Controllers
         }
 
         // Put api/files/{id}/metadata
-        // Updates the file metadata
+        // Updates or adds custom metadata key-value pairs for the file
         [HttpPut("{id}/metadata")]
         public async Task<IActionResult> UpdateFileMetadata(int id, [FromBody] UpdateFileMetadataDTO metadataDto)
         {
