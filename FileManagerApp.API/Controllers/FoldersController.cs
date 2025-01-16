@@ -110,7 +110,38 @@ namespace FileManagerApp.API.Controllers
             return NoContent();
         }
 
-        
+        // Post api/folders/batch-delete
+        // Marks multiple folders as deleted (soft delete)
+        [HttpPost("batch-delete")]
+        public async Task<IActionResult> BatchDeleteFolders([FromBody] BatchDeleteFoldersDTO deleteDto)
+        {
+            try
+            {
+                if (deleteDto.FolderIds == null || !deleteDto.FolderIds.Any())
+                {
+                    return BadRequest("No folder IDs provided for deletion");
+                }
+
+                Console.WriteLine($"Starting batch deletion of {deleteDto.FolderIds.Count} folders");
+
+                await _unitOfWork.Folders.BatchDeleteAsync(deleteDto.FolderIds);
+
+                await _unitOfWork.SaveChangesAsync();
+
+                Console.WriteLine("Batch folder deletion completed successfully");
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error during batch folder deletion: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+
+                return StatusCode(500, "An error occurred while deleting folders");
+            }
+        }
+
+
         [HttpPut("{id}/move")]
         public async Task<IActionResult> MoveFolder(int id, [FromBody] MoveFolderDTO moveFolderDto)
         {

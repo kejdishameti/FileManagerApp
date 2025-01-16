@@ -49,6 +49,28 @@ namespace FileManagerApp.Data.Repositories
             _context.Folders.Update(entity);
         }
 
+        public async Task BatchDeleteAsync(IEnumerable<int> folderIds)
+        {
+            try
+            {
+                var foldersToDelete = await _context.Folders
+                    .Where(f => folderIds.Contains(f.Id) && !f.IsDeleted)
+                    .ToListAsync();
+
+                foreach (var folder in foldersToDelete)
+                {
+                    folder.MarkAsDeleted();
+                    _context.Folders.Update(folder);
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in batch folder deletion: {ex.Message}");
+                throw; 
+            }
+        }
+
         public async Task<Folder> GetFolderByPathAsync(string path)
         {
             return await _context.Folders
