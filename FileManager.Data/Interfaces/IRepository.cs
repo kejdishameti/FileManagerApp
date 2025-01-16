@@ -29,5 +29,6 @@ namespace FileManagerApp.Data.Interfaces
     {
         Task<Folder> GetFolderByPathAsync(string path);
         Task<IEnumerable<Folder>> GetChildFoldersByParentIdAsync(int parentFolderId);
+        Task<IEnumerable<Folder>> SearchFoldersAsync(string searchTerm);
     }
 }

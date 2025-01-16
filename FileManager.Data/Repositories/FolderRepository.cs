@@ -61,5 +61,30 @@ namespace FileManagerApp.Data.Repositories
                 .Where(f => f.ParentFolderId == parentFolderId && !f.IsDeleted)
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<Folder>> SearchFoldersAsync(string searchTerm)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(searchTerm))
+                    return new List<Folder>();
+
+                searchTerm = searchTerm.ToLower();
+
+                var folders = await _context.Folders
+                    .Where(f => !f.IsDeleted &&
+                               (f.Name.ToLower().Contains(searchTerm) ||
+                                f.Path.ToLower().Contains(searchTerm)))
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                return folders;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Database error in SearchFoldersAsync: {ex.Message}");
+                throw;
+            }
+        }
     }
 }

@@ -221,5 +221,46 @@ namespace FileManagerApp.API.Controllers
                 Children = children
             };
         }
+
+        // Get api/folders/search
+        // Searches for folders by name or path
+        [HttpGet("search")]
+        public async Task<ActionResult<IEnumerable<FolderDTO>>> SearchFolders([FromQuery] string term)
+        {
+            try
+            {
+                Console.WriteLine($"Starting folder search operation with term: {term}");
+
+                if (string.IsNullOrWhiteSpace(term))
+                    return BadRequest("Search term cannot be empty");
+
+                Console.WriteLine("Calling repository SearchFoldersAsync method");
+                var folders = await _unitOfWork.Folders.SearchFoldersAsync(term);
+                Console.WriteLine($"Repository returned {folders?.Count() ?? 0} folders");
+
+                var response = folders.Select(f => new FolderDTO
+                {
+                    Id = f.Id,
+                    Name = f.Name,
+                    Path = f.Path,
+                    CreatedAt = f.CreatedAt,
+                    ParentFolderId = f.ParentFolderId
+                }).ToList();
+
+                Console.WriteLine($"Successfully mapped {response.Count} folders to DTOs");
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error searching folders:");
+                Console.WriteLine($"Message: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                return StatusCode(500, "An error occurred while searching folders");
+            }
+        }
     }
 }
