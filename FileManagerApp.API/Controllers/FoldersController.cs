@@ -225,18 +225,14 @@ namespace FileManagerApp.API.Controllers
         // Get api/folders/search
         // Searches for folders by name or path
         [HttpGet("search")]
-        public async Task<ActionResult<IEnumerable<FolderDTO>>> SearchFolders([FromQuery] string term)
+        public async Task<ActionResult<IEnumerable<FolderDTO>>> SearchFolders([FromQuery] FolderSearchDTO searchDto)
         {
             try
             {
-                Console.WriteLine($"Starting folder search operation with term: {term}");
-
-                if (string.IsNullOrWhiteSpace(term))
+                if (string.IsNullOrWhiteSpace(searchDto.SearchTerm))
                     return BadRequest("Search term cannot be empty");
 
-                Console.WriteLine("Calling repository SearchFoldersAsync method");
-                var folders = await _unitOfWork.Folders.SearchFoldersAsync(term);
-                Console.WriteLine($"Repository returned {folders?.Count() ?? 0} folders");
+                var folders = await _unitOfWork.Folders.SearchFoldersAsync(searchDto.SearchTerm);
 
                 var response = folders.Select(f => new FolderDTO
                 {
@@ -247,18 +243,11 @@ namespace FileManagerApp.API.Controllers
                     ParentFolderId = f.ParentFolderId
                 }).ToList();
 
-                Console.WriteLine($"Successfully mapped {response.Count} folders to DTOs");
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error searching folders:");
-                Console.WriteLine($"Message: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                if (ex.InnerException != null)
-                {
-                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
-                }
+                Console.WriteLine($"Error searching folders: {ex.Message}");
                 return StatusCode(500, "An error occurred while searching folders");
             }
         }
