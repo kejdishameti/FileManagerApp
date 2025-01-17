@@ -29,6 +29,7 @@ namespace FileManagerApp.API.Controllers
         // Post api/folders
         // Creates a new folder
         [HttpPost]
+        [HttpPost]
         public async Task<ActionResult<FolderDTO>> CreateFolder(CreateFolderDTO createFolderDto)
         {
             try
@@ -36,20 +37,30 @@ namespace FileManagerApp.API.Controllers
                 if (string.IsNullOrWhiteSpace(createFolderDto.Name))
                     return BadRequest("Folder name cannot be empty.");
 
-                string parentPath = "";
+                string parentPath = ""; 
+
                 if (createFolderDto.ParentFolderId.HasValue)
                 {
                     var parentFolder = await _unitOfWork.Folders.GetByIdAsync(createFolderDto.ParentFolderId.Value);
                     if (parentFolder == null)
                         return BadRequest("Parent folder not found");
+
                     parentPath = parentFolder.Path;
+                    Console.WriteLine($"Creating folder in parent path: {parentPath}");
+                }
+                else
+                {
+                    Console.WriteLine("Creating root-level folder");
                 }
 
                 var folder = Folder.Create(createFolderDto.Name, createFolderDto.ParentFolderId);
-                folder.SetPath(parentPath);
+
+                folder.SetPath(parentPath);  
 
                 await _unitOfWork.Folders.AddAsync(folder);
                 await _unitOfWork.SaveChangesAsync();
+
+                Console.WriteLine($"Successfully created folder: {folder.Path}");
 
                 return CreatedAtAction(
                     nameof(GetFolder),
@@ -59,6 +70,7 @@ namespace FileManagerApp.API.Controllers
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error creating folder: {ex.Message}");
                 return BadRequest($"Could not create folder: {ex.Message}");
             }
         }
@@ -77,7 +89,7 @@ namespace FileManagerApp.API.Controllers
         }
 
         // Put api/folders/{id}
-        // Updates a folder
+        // Updates folder properties
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateFolder(int id, UpdateFolderDTO updateFolderDto)
         {
@@ -92,6 +104,50 @@ namespace FileManagerApp.API.Controllers
             await _unitOfWork.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // Updates or adds custom metadata key-value pairs for the folder
+        [HttpPut("{id}/metadata")]
+        public async Task<IActionResult> UpdateFolderMetadata(int id, [FromBody] UpdateFolderMetadataDTO metadataDto)
+        {
+            try
+            {
+                // Get the folder
+                var folder = await _unitOfWork.Folders.GetByIdAsync(id);
+                if (folder == null)
+                    return NotFound($"Folder with ID {id} not found");
+
+                Console.WriteLine($"Updating metadata for folder {id} - {folder.Name}");
+
+                // Update each piece of metadata
+                foreach (var item in metadataDto.Metadata)
+                {
+                    folder.AddOrUpdateMetadata(item.Key, item.Value);
+                    Console.WriteLine($"Added/Updated metadata: {item.Key} = {item.Value}");
+                }
+
+                // Save changes
+                _unitOfWork.Folders.Update(folder);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Prepare response
+                var response = new FolderDTO
+                {
+                    Id = folder.Id,
+                    Name = folder.Name,
+                    Path = folder.Path,
+                    CreatedAt = folder.CreatedAt,
+                    ParentFolderId = folder.ParentFolderId,
+                    Metadata = new Dictionary<string, string>(folder.Metadata)
+                };
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating folder metadata: {ex.Message}");
+                return StatusCode(500, "An error occurred while updating folder metadata");
+            }
         }
 
         // Delete api/folders/{id}

@@ -51,21 +51,26 @@ namespace FileManagerApp.Domain.Entities
         private Folder() { }
 
         // Method to create a new folder
-        public static Folder Create(string name, int? parentFolderId = null)
+        public static Folder Create(string name, int? parentFolderId = null) 
         {
             if (string.IsNullOrEmpty(name))
                 throw new ArgumentException("Folder must have a name");
-
-            // Initial path
-            string path = "/" + name;
 
             return new Folder
             {
                 Name = name,
                 ParentFolderId = parentFolderId,
-                Path = path,
+                Path = "/" + name,
                 CreatedAt = DateTime.UtcNow
             };
+        }
+
+        // Metadata
+        private Dictionary<string, string> _metadata = new();
+        public Dictionary<string, string> Metadata
+        {
+            get => _metadata;
+            private set => _metadata = value ?? new Dictionary<string, string>();
         }
 
         // Method to add a file to this folder
@@ -99,6 +104,45 @@ namespace FileManagerApp.Domain.Entities
         {
             ParentFolderId = newParentFolderId;
             ModifiedAt = DateTime.UtcNow;
+        }
+
+        // Add methods to manage metadata
+        public void AddOrUpdateMetadata(string key, string value)
+        {
+            if (string.IsNullOrEmpty(key))
+                throw new ArgumentException("Metadata key cannot be empty");
+
+            var normalizedKey = key.Trim().ToLower();
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                RemoveMetadata(normalizedKey);
+                return;
+            }
+
+            _metadata[normalizedKey] = value.Trim();
+            ModifiedAt = DateTime.UtcNow;
+        }
+
+        public string GetMetadataValue(string key)
+        {
+            if (string.IsNullOrEmpty(key))
+                throw new ArgumentException("Key cannot be empty");
+
+            var normalizedKey = key.Trim().ToLower();
+            return _metadata.TryGetValue(normalizedKey, out var value) ? value : null;
+        }
+
+        public void RemoveMetadata(string key)
+        {
+            if (string.IsNullOrEmpty(key))
+                throw new ArgumentException("Key cannot be empty");
+
+            var normalizedKey = key.Trim().ToLower();
+            if (_metadata.Remove(normalizedKey))
+            {
+                ModifiedAt = DateTime.UtcNow;
+            }
         }
     }
 }

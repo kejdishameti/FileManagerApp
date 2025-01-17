@@ -3,6 +3,6 @@
     public class CreateFolderDTO
     {
         public string Name { get; set; }
-        public int? ParentFolderId { get; set; }
+        public int? ParentFolderId { get; set; } = null;
     }
 }

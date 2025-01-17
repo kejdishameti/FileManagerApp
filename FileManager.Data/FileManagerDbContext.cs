@@ -47,20 +47,25 @@ namespace FileManagerApp.Data
                     );
             });
 
-            // Configure the Folder entity
             modelBuilder.Entity<Folder>(entity =>
             {
                 entity.ToTable("Folders");
-
                 entity.HasKey(e => e.Id);
-
                 entity.HasOne(e => e.ParentFolder)
                     .WithMany(e => e.ChildFolders)
                     .HasForeignKey(e => e.ParentFolderId)
                     .OnDelete(DeleteBehavior.Restrict);
-
                 entity.HasIndex(e => e.Path)
                     .IsUnique();
+
+                // Add metadata configuration
+                entity.Property(e => e.Metadata)
+                    .HasColumnType("jsonb")
+                    .HasDefaultValueSql("'{}'::jsonb")
+                    .HasConversion(
+                        v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
+                        v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()) ?? new Dictionary<string, string>()
+                    );
             });
 
             // Configure the User entity
