@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 using FileManagerApp.Domain.ValidationAttributes;
-
 
 namespace FileManagerApp.Domain.Entities
 {
@@ -22,36 +16,35 @@ namespace FileManagerApp.Domain.Entities
         [PathValidation]
         public string Path { get; internal set; }
 
+        public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
+        public DateTime? ModifiedAt { get; private set; }
+        public bool IsDeleted { get; private set; }
+        public DateTime? DeletedAt { get; private set; }
+
+        // Relationships
+        public int? ParentFolderId { get; private set; }
+        public virtual Folder ParentFolder { get; private set; }
+
+        private List<Folder> _childFolders = new();
+        public IReadOnlyCollection<Folder> ChildFolders => _childFolders;
+
+        private List<File> _files = new();
+        public IReadOnlyCollection<File> Files => _files;
+
+        // New property for tags
+        private List<string> _tags = new();
+        public IReadOnlyCollection<string> Tags => _tags.AsReadOnly();
+
         public void SetPath(string parentPath = "")
         {
             Path = string.IsNullOrEmpty(parentPath)
                 ? "/" + Name
                 : parentPath + "/" + Name;
         }
-        // Timestamps
-        public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
-        public DateTime? ModifiedAt { get; private set; }
-        public bool IsDeleted { get; private set; }
-        public DateTime? DeletedAt { get; private set; }
 
-
-        // Relationship with parent folder
-        public int? ParentFolderId { get; private set; }
-        public virtual Folder ParentFolder { get; private set; }
-
-        // Relationship with child folders
-        private List<Folder> _childFolders = new();
-        public IReadOnlyCollection<Folder> ChildFolders => _childFolders;
-
-        // Relationship with files
-        private List<File> _files = new();
-        public IReadOnlyCollection<File> Files => _files;
-
-        // Private constructor for Entity Framework
         private Folder() { }
 
-        // Method to create a new folder
-        public static Folder Create(string name, int? parentFolderId = null) 
+        public static Folder Create(string name, int? parentFolderId = null)
         {
             if (string.IsNullOrEmpty(name))
                 throw new ArgumentException("Folder must have a name");
@@ -65,15 +58,50 @@ namespace FileManagerApp.Domain.Entities
             };
         }
 
-        // Metadata
-        private Dictionary<string, string> _metadata = new();
-        public Dictionary<string, string> Metadata
+        // Tag management methods
+        public void AddTag(string tag)
         {
-            get => _metadata;
-            private set => _metadata = value ?? new Dictionary<string, string>();
+            if (string.IsNullOrWhiteSpace(tag))
+                throw new ArgumentException("Tag cannot be empty");
+
+            var normalizedTag = tag.Trim().ToLower();
+            if (!_tags.Contains(normalizedTag))
+            {
+                _tags.Add(normalizedTag);
+                ModifiedAt = DateTime.UtcNow;
+            }
         }
 
-        // Method to add a file to this folder
+        public void RemoveTag(string tag)
+        {
+            var normalizedTag = tag.Trim().ToLower();
+            if (_tags.Remove(normalizedTag))
+            {
+                ModifiedAt = DateTime.UtcNow;
+            }
+        }
+
+        public void ClearTags()
+        {
+            if (_tags.Any())
+            {
+                _tags.Clear();
+                ModifiedAt = DateTime.UtcNow;
+            }
+        }
+
+        public void UpdateTags(IEnumerable<string> tags)
+        {
+            if (tags == null)
+                throw new ArgumentNullException(nameof(tags));
+
+            _tags = tags.Select(t => t.Trim().ToLower())
+                       .Where(t => !string.IsNullOrWhiteSpace(t))
+                       .Distinct()
+                       .ToList();
+            ModifiedAt = DateTime.UtcNow;
+        }
+
         public void AddFile(File file)
         {
             if (file == null)
@@ -83,7 +111,6 @@ namespace FileManagerApp.Domain.Entities
             ModifiedAt = DateTime.UtcNow;
         }
 
-        // Method to create a subfolder within this folder
         public void AddChildFolder(Folder folder)
         {
             if (folder == null)
@@ -93,7 +120,6 @@ namespace FileManagerApp.Domain.Entities
             ModifiedAt = DateTime.UtcNow;
         }
 
-        // Method to mark folder as deleted
         public void MarkAsDeleted()
         {
             IsDeleted = true;
@@ -104,45 +130,6 @@ namespace FileManagerApp.Domain.Entities
         {
             ParentFolderId = newParentFolderId;
             ModifiedAt = DateTime.UtcNow;
-        }
-
-        // Add methods to manage metadata
-        public void AddOrUpdateMetadata(string key, string value)
-        {
-            if (string.IsNullOrEmpty(key))
-                throw new ArgumentException("Metadata key cannot be empty");
-
-            var normalizedKey = key.Trim().ToLower();
-
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                RemoveMetadata(normalizedKey);
-                return;
-            }
-
-            _metadata[normalizedKey] = value.Trim();
-            ModifiedAt = DateTime.UtcNow;
-        }
-
-        public string GetMetadataValue(string key)
-        {
-            if (string.IsNullOrEmpty(key))
-                throw new ArgumentException("Key cannot be empty");
-
-            var normalizedKey = key.Trim().ToLower();
-            return _metadata.TryGetValue(normalizedKey, out var value) ? value : null;
-        }
-
-        public void RemoveMetadata(string key)
-        {
-            if (string.IsNullOrEmpty(key))
-                throw new ArgumentException("Key cannot be empty");
-
-            var normalizedKey = key.Trim().ToLower();
-            if (_metadata.Remove(normalizedKey))
-            {
-                ModifiedAt = DateTime.UtcNow;
-            }
         }
     }
 }

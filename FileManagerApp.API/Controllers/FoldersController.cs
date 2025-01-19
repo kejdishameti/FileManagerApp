@@ -3,32 +3,56 @@ using Microsoft.AspNetCore.Mvc;
 using AutoMapper;
 using FileManagerApp.API.DTO.Folder;
 using FileManagerApp.Domain.Entities;
+using FileManagerApp.Service.Implementations;
+using FileManagerApp.Service.Interfaces;
+using FileManagerApp.Service.DTOs;
 
 namespace FileManagerApp.API.Controllers
 {
+    [Route("api/[controller]")]
+    [ApiController]
     public class FoldersController : BaseApiController
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-        
-        public FoldersController(IUnitOfWork unitOfWork, IMapper mapper)
+        private readonly IFolderService _folderService;
+
+        public FoldersController(IUnitOfWork unitOfWork, IMapper mapper, IFolderService folderService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _folderService = folderService;
         }
 
-        // Get api/folders
-        // Rertrives all folders
+        // GET: api/folders
+        // Retrieves all folders
         [HttpGet]
         public async Task<ActionResult<IEnumerable<FolderDTO>>> GetFolders()
         {
-            var folders = await _unitOfWork.Folders.GetAllAsync();
-            return Ok(_mapper.Map<IEnumerable<FolderDTO>>(folders));
+            try
+            {
+                var folders = await _unitOfWork.Folders.GetAllAsync();
+                var folderDtos = folders.Select(f => new FolderDTO
+                {
+                    Id = f.Id,
+                    Name = f.Name,
+                    Path = f.Path,
+                    CreatedAt = f.CreatedAt,
+                    ParentFolderId = f.ParentFolderId,
+                    Tags = f.Tags.ToList()
+                });
+
+                return Ok(folderDtos);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error retrieving folders: {ex.Message}");
+                return StatusCode(500, "An error occurred while retrieving folders");
+            }
         }
 
-        // Post api/folders
+        // POST: api/folders
         // Creates a new folder
-        [HttpPost]
         [HttpPost]
         public async Task<ActionResult<FolderDTO>> CreateFolder(CreateFolderDTO createFolderDto)
         {
@@ -37,7 +61,7 @@ namespace FileManagerApp.API.Controllers
                 if (string.IsNullOrWhiteSpace(createFolderDto.Name))
                     return BadRequest("Folder name cannot be empty.");
 
-                string parentPath = ""; 
+                string parentPath = "";
 
                 if (createFolderDto.ParentFolderId.HasValue)
                 {
@@ -46,27 +70,31 @@ namespace FileManagerApp.API.Controllers
                         return BadRequest("Parent folder not found");
 
                     parentPath = parentFolder.Path;
-                    Console.WriteLine($"Creating folder in parent path: {parentPath}");
-                }
-                else
-                {
-                    Console.WriteLine("Creating root-level folder");
                 }
 
                 var folder = Folder.Create(createFolderDto.Name, createFolderDto.ParentFolderId);
+                folder.SetPath(parentPath);
 
-                folder.SetPath(parentPath);  
+                // Add initial tags if provided
+                if (createFolderDto.Tags != null && createFolderDto.Tags.Any())
+                {
+                    folder.UpdateTags(createFolderDto.Tags);
+                }
 
                 await _unitOfWork.Folders.AddAsync(folder);
                 await _unitOfWork.SaveChangesAsync();
 
-                Console.WriteLine($"Successfully created folder: {folder.Path}");
+                var response = new FolderDTO
+                {
+                    Id = folder.Id,
+                    Name = folder.Name,
+                    Path = folder.Path,
+                    CreatedAt = folder.CreatedAt,
+                    ParentFolderId = folder.ParentFolderId,
+                    Tags = folder.Tags.ToList()
+                };
 
-                return CreatedAtAction(
-                    nameof(GetFolder),
-                    new { id = folder.Id },
-                    _mapper.Map<FolderDTO>(folder)
-                );
+                return CreatedAtAction(nameof(GetFolder), new { id = folder.Id }, response);
             }
             catch (Exception ex)
             {
@@ -75,8 +103,8 @@ namespace FileManagerApp.API.Controllers
             }
         }
 
-        // Get api/folders/{id}
-        // Retrives a folder by id
+        // GET: api/folders/{id}
+        // Retrieves a specific folder
         [HttpGet("{id}")]
         public async Task<ActionResult<FolderDTO>> GetFolder(int id)
         {
@@ -85,52 +113,66 @@ namespace FileManagerApp.API.Controllers
             if (folder == null)
                 return NotFound($"Folder with ID {id} not found");
 
-            return Ok(_mapper.Map<FolderDTO>(folder));
+            var response = new FolderDTO
+            {
+                Id = folder.Id,
+                Name = folder.Name,
+                Path = folder.Path,
+                CreatedAt = folder.CreatedAt,
+                ParentFolderId = folder.ParentFolderId,
+                Tags = folder.Tags.ToList()
+            };
+
+            return Ok(response);
         }
 
-        // Put api/folders/{id}
+        // PUT: api/folders/{id}
         // Updates folder properties
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateFolder(int id, UpdateFolderDTO updateFolderDto)
         {
-            var folder = await _unitOfWork.Folders.GetByIdAsync(id);
-
-            if (folder == null)
-                return NotFound($"Folder with ID {id} not found");
-
-            _mapper.Map(updateFolderDto, folder);
-
-            _unitOfWork.Folders.Update(folder);
-            await _unitOfWork.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        // Updates or adds custom metadata key-value pairs for the folder
-        [HttpPut("{id}/metadata")]
-        public async Task<IActionResult> UpdateFolderMetadata(int id, [FromBody] UpdateFolderMetadataDTO metadataDto)
-        {
             try
             {
-                // Get the folder
                 var folder = await _unitOfWork.Folders.GetByIdAsync(id);
                 if (folder == null)
                     return NotFound($"Folder with ID {id} not found");
 
-                Console.WriteLine($"Updating metadata for folder {id} - {folder.Name}");
-
-                // Update each piece of metadata
-                foreach (var item in metadataDto.Metadata)
+                if (!string.IsNullOrWhiteSpace(updateFolderDto.Name))
                 {
-                    folder.AddOrUpdateMetadata(item.Key, item.Value);
-                    Console.WriteLine($"Added/Updated metadata: {item.Key} = {item.Value}");
+                    // Handle name update if needed
                 }
 
-                // Save changes
+                if (updateFolderDto.Tags != null)
+                {
+                    folder.UpdateTags(updateFolderDto.Tags);
+                }
+
                 _unitOfWork.Folders.Update(folder);
                 await _unitOfWork.SaveChangesAsync();
 
-                // Prepare response
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "An error occurred while updating the folder");
+            }
+        }
+
+        // PUT: api/folders/{id}/tags
+        // Updates folder tags
+        [HttpPut("{id}/tags")]
+        public async Task<IActionResult> UpdateFolderTags(int id, [FromBody] UpdateFolderTagsDTO tagsDto)
+        {
+            try
+            {
+                var folder = await _unitOfWork.Folders.GetByIdAsync(id);
+                if (folder == null)
+                    return NotFound($"Folder with ID {id} not found");
+
+                folder.UpdateTags(tagsDto.Tags);
+                _unitOfWork.Folders.Update(folder);
+                await _unitOfWork.SaveChangesAsync();
+
                 var response = new FolderDTO
                 {
                     Id = folder.Id,
@@ -138,20 +180,19 @@ namespace FileManagerApp.API.Controllers
                     Path = folder.Path,
                     CreatedAt = folder.CreatedAt,
                     ParentFolderId = folder.ParentFolderId,
-                    Metadata = new Dictionary<string, string>(folder.Metadata)
+                    Tags = folder.Tags.ToList()
                 };
 
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error updating folder metadata: {ex.Message}");
-                return StatusCode(500, "An error occurred while updating folder metadata");
+                return StatusCode(500, "An error occurred while updating folder tags");
             }
         }
 
-        // Delete api/folders/{id}
-        // Marks a folder as deleted (soft delete)
+        // DELETE: api/folders/{id}
+        // Soft deletes a folder
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteFolder(int id)
         {
@@ -166,8 +207,8 @@ namespace FileManagerApp.API.Controllers
             return NoContent();
         }
 
-        // Post api/folders/batch-delete
-        // Marks multiple folders as deleted (soft delete)
+        // POST: api/folders/batch-delete
+        // Soft deletes multiple folders
         [HttpPost("batch-delete")]
         public async Task<IActionResult> BatchDeleteFolders([FromBody] BatchDeleteFoldersDTO deleteDto)
         {
@@ -178,32 +219,25 @@ namespace FileManagerApp.API.Controllers
                     return BadRequest("No folder IDs provided for deletion");
                 }
 
-                Console.WriteLine($"Starting batch deletion of {deleteDto.FolderIds.Count} folders");
-
                 await _unitOfWork.Folders.BatchDeleteAsync(deleteDto.FolderIds);
-
                 await _unitOfWork.SaveChangesAsync();
-
-                Console.WriteLine("Batch folder deletion completed successfully");
 
                 return NoContent();
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error during batch folder deletion: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-
                 return StatusCode(500, "An error occurred while deleting folders");
             }
         }
 
-
+        // PUT: api/folders/{id}/move
+        // Moves a folder to a new parent
         [HttpPut("{id}/move")]
         public async Task<IActionResult> MoveFolder(int id, [FromBody] MoveFolderDTO moveFolderDto)
         {
             try
             {
-                // Get the folder we want to move
                 var folder = await _unitOfWork.Folders.GetByIdAsync(id);
                 if (folder == null)
                     return NotFound($"Folder with ID {id} not found");
@@ -219,10 +253,9 @@ namespace FileManagerApp.API.Controllers
                         return BadRequest("Cannot move a folder into itself or its children");
                 }
 
-                // Update the folder's parent and path
                 folder.UpdateParentFolder(moveFolderDto.NewParentFolderId);
 
-                // Get the new parent's path (if any) to update this folder's path
+                // Update the path
                 string parentPath = "";
                 if (moveFolderDto.NewParentFolderId.HasValue)
                 {
@@ -242,6 +275,7 @@ namespace FileManagerApp.API.Controllers
             }
         }
 
+        // Helper method to prevent circular references when moving folders
         private async Task<bool> IsFolderCircularReference(int sourceId, int targetParentId)
         {
             var currentFolder = await _unitOfWork.Folders.GetByIdAsync(targetParentId);
@@ -258,59 +292,50 @@ namespace FileManagerApp.API.Controllers
             return false;
         }
 
-        // Get api/folders/{id}/children
-        // Retrives all children of a folder
+        // GET: api/folders/{id}/children
+        // Retrieves all children of a folder
         [HttpGet("{id}/children")]
         public async Task<ActionResult<IEnumerable<FolderDTO>>> GetChildFolders(int id)
         {
             var childFolders = await _unitOfWork.Folders.GetChildFoldersByParentIdAsync(id);
-            return Ok(_mapper.Map<IEnumerable<FolderDTO>>(childFolders));
+            var response = childFolders.Select(f => new FolderDTO
+            {
+                Id = f.Id,
+                Name = f.Name,
+                Path = f.Path,
+                CreatedAt = f.CreatedAt,
+                ParentFolderId = f.ParentFolderId,
+                Tags = f.Tags.ToList()
+            });
+
+            return Ok(response);
         }
 
-        // Get api/folders/tree
-        // Retrives the folder structure as a tree
+        // GET: api/folders/tree
+        // Retrieves the folder hierarchy as a tree structure
         [HttpGet("tree")]
         public async Task<ActionResult<IEnumerable<FolderTreeDTO>>> GetFolderTree()
         {
             try
             {
-                // First, get all folders
-                var allFolders = await _unitOfWork.Folders.GetAllAsync();
+                // Get the complete folder tree from the service
+                var folderTree = await _folderService.GetFolderTreeAsync();
 
-                // Start with root folders (those without a parent)
-                var rootFolders = allFolders.Where(f => !f.ParentFolderId.HasValue).ToList();
+                // Log the successful retrieval
+                Console.WriteLine("Successfully retrieved folder tree structure");
 
-                // Build tree starting from root folders
-                var treeView = rootFolders.Select(folder => BuildFolderTree(folder, allFolders)).ToList();
-
-                return Ok(treeView);
+                return Ok(folderTree);
             }
             catch (Exception ex)
             {
+                // Log any errors that occur
+                Console.WriteLine($"Error retrieving folder tree: {ex.Message}");
                 return StatusCode(500, "An error occurred while retrieving the folder structure");
             }
         }
 
-        // Helper method to build the tree structure recursively
-        private FolderTreeDTO BuildFolderTree(Folder folder, IEnumerable<Folder> allFolders)
-        {
-            // Find all children of current folder
-            var children = allFolders
-                .Where(f => f.ParentFolderId == folder.Id)
-                .Select(childFolder => BuildFolderTree(childFolder, allFolders))
-                .ToList();
-
-            // Create the DTO with folder info and its children
-            return new FolderTreeDTO
-            {
-                Id = folder.Id,
-                Name = folder.Name,
-                Children = children
-            };
-        }
-
-        // Get api/folders/search
-        // Searches for folders by name or path
+        // GET: api/folders/search
+        // Searches for folders by name, path, or tags
         [HttpGet("search")]
         public async Task<ActionResult<IEnumerable<FolderDTO>>> SearchFolders([FromQuery] FolderSearchDTO searchDto)
         {
@@ -320,15 +345,15 @@ namespace FileManagerApp.API.Controllers
                     return BadRequest("Search term cannot be empty");
 
                 var folders = await _unitOfWork.Folders.SearchFoldersAsync(searchDto.SearchTerm);
-
                 var response = folders.Select(f => new FolderDTO
                 {
                     Id = f.Id,
                     Name = f.Name,
                     Path = f.Path,
                     CreatedAt = f.CreatedAt,
-                    ParentFolderId = f.ParentFolderId
-                }).ToList();
+                    ParentFolderId = f.ParentFolderId,
+                    Tags = f.Tags.ToList()
+                });
 
                 return Ok(response);
             }

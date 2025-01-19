@@ -1,13 +1,6 @@
 ﻿using FileManagerApp.Data.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Query.Expressions.Internal;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using DomainFile = FileManagerApp.Domain.Entities.File;
-
 
 namespace FileManagerApp.Data.Repositories
 {
@@ -23,15 +16,24 @@ namespace FileManagerApp.Data.Repositories
         public async Task<DomainFile> GetByIdAsync(int id)
         {
             return await _context.Files
+                .AsNoTracking()
                 .FirstOrDefaultAsync(f => f.Id == id && !f.IsDeleted);
         }
 
         public async Task<IEnumerable<DomainFile>> GetAllAsync()
         {
             return await _context.Files
-            .Where(f => !f.IsDeleted)
-            .AsNoTracking()  
-            .ToListAsync();
+                .Where(f => !f.IsDeleted)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<DomainFile>> GetFilesByFolderIdAsync(int folderId)
+        {
+            return await _context.Files
+                .Where(f => f.FolderId == folderId && !f.IsDeleted)
+                .AsNoTracking()
+                .ToListAsync();
         }
 
         public async Task AddAsync(DomainFile entity)
@@ -59,20 +61,15 @@ namespace FileManagerApp.Data.Repositories
             foreach (var file in filesToDelete)
             {
                 file.MarkAsDeleted();
-                _context.Files.Update(file);
             }
-        }
 
-        public async Task<IEnumerable<DomainFile>> GetFilesByFolderIdAsync(int folderId)
-        {
-            return await _context.Files
-                .Where(f => f.FolderId == folderId && !f.IsDeleted)
-                .ToListAsync();
+            _context.Files.UpdateRange(filesToDelete);
         }
 
         public async Task<DomainFile> GetFileByPathAsync(string path)
         {
             return await _context.Files
+                .AsNoTracking()
                 .FirstOrDefaultAsync(f => f.StoragePath == path && !f.IsDeleted);
         }
 
@@ -87,26 +84,32 @@ namespace FileManagerApp.Data.Repositories
 
                 var files = await _context.Files
                     .Where(f => !f.IsDeleted &&
-                               f.Name.ToLower().Contains(searchTerm))
+                               (f.Name.ToLower().Contains(searchTerm) ||    
+                                f.Tags.Any(t => t.ToLower().Contains(searchTerm)))
+                    )
                     .AsNoTracking()
                     .ToListAsync();
 
-                var metadataMatches = await _context.Files
-                    .Where(f => !f.IsDeleted)
-                    .AsNoTracking()
-                    .ToListAsync();
-
-                var filesWithMetadataMatch = metadataMatches
-                    .Where(f => f.Metadata != null &&
-                               f.Metadata.Any(m => m.Value?.ToLower().Contains(searchTerm) ?? false));
-
-                return files.Union(filesWithMetadataMatch);
+                return files;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Database error in SearchFilesAsync: {ex.Message}");
                 throw;
             }
+        }
+
+        public async Task<IEnumerable<DomainFile>> GetFilesByTagAsync(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag))
+                return new List<DomainFile>();
+
+            tag = tag.Trim().ToLower();
+
+            return await _context.Files
+                .Where(f => !f.IsDeleted && f.Tags.Contains(tag))
+                .AsNoTracking()
+                .ToListAsync();
         }
     }
 }

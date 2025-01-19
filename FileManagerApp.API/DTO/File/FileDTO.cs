@@ -9,6 +9,6 @@
         public string StoragePath { get; set; }
         public DateTime CreatedAt { get; set; }
         public int? FolderId { get; set; }
-        public Dictionary<string, string> Metadata { get; set; }
+        public IEnumerable<string> Tags { get; set; } = new List<string>();
     }
 }

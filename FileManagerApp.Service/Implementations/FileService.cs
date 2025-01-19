@@ -1,14 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using FileManagerApp.Data.UnitOfWork;
+﻿using FileManagerApp.Data.UnitOfWork;
 using FileManagerApp.Service.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using DomainFile = FileManagerApp.Domain.Entities.File;
-
 
 namespace FileManagerApp.Service.Implementations
 {
@@ -48,7 +42,7 @@ namespace FileManagerApp.Service.Implementations
             return await _unitOfWork.Files.GetFilesByFolderIdAsync(folderId);
         }
 
-        public async Task<DomainFile> UploadFileAsync(IFormFile file, int? folderId, Dictionary<string, string> metadata)
+        public async Task<DomainFile> UploadFileAsync(IFormFile file, int? folderId, IEnumerable<string> tags)
         {
             // Validate file
             if (file == null || file.Length == 0)
@@ -94,12 +88,10 @@ namespace FileManagerApp.Service.Implementations
                 if (folderId.HasValue)
                     fileEntity.MoveToFolder(folderId);
 
-                if (metadata?.Count > 0)
+                // Add tags if provided
+                if (tags != null && tags.Any())
                 {
-                    foreach (var item in metadata)
-                    {
-                        fileEntity.AddOrUpdateMetadata(item.Key, item.Value);
-                    }
+                    fileEntity.UpdateTags(tags);
                 }
 
                 await _unitOfWork.Files.AddAsync(fileEntity);
@@ -109,6 +101,7 @@ namespace FileManagerApp.Service.Implementations
             }
             catch
             {
+                // Clean up the physical file if something goes wrong
                 if (System.IO.File.Exists(filePath))
                     System.IO.File.Delete(filePath);
                 throw;
@@ -126,19 +119,16 @@ namespace FileManagerApp.Service.Implementations
             return true;
         }
 
-        public async Task<DomainFile> UpdateFileAsync(int id, string newName, Dictionary<string, string> metadata)
+        public async Task<DomainFile> UpdateFileAsync(int id, string newName, IEnumerable<string> tags)
         {
             var file = await _unitOfWork.Files.GetByIdAsync(id);
             if (file == null)
                 throw new ArgumentException($"File with ID {id} not found");
 
-            // Update metadata if provided
-            if (metadata != null)
+            // Update tags if provided
+            if (tags != null)
             {
-                foreach (var item in metadata)
-                {
-                    file.AddOrUpdateMetadata(item.Key, item.Value);
-                }
+                file.UpdateTags(tags);
             }
 
             _unitOfWork.Files.Update(file);
@@ -175,6 +165,13 @@ namespace FileManagerApp.Service.Implementations
 
             return System.IO.File.OpenRead(file.StoragePath);
         }
-    }
 
+        public async Task<IEnumerable<DomainFile>> SearchFilesByTagAsync(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag))
+                throw new ArgumentException("Tag cannot be empty");
+
+            return await _unitOfWork.Files.GetFilesByTagAsync(tag);
+        }
+    }
 }

@@ -23,6 +23,7 @@ namespace FileManagerApp.Data.Interfaces
         Task<IEnumerable<DomainFile>> GetFilesByFolderIdAsync(int folderId);
         Task<DomainFile> GetFileByPathAsync(string path);
         Task<IEnumerable<DomainFile>> SearchFilesAsync(string searchTerm);
+        Task<IEnumerable<DomainFile>> GetFilesByTagAsync(string tag);
         Task BatchDeleteAsync(IEnumerable<int> fileIds);
 
     }
@@ -32,6 +33,7 @@ namespace FileManagerApp.Data.Interfaces
         Task<Folder> GetFolderByPathAsync(string path);
         Task<IEnumerable<Folder>> GetChildFoldersByParentIdAsync(int parentFolderId);
         Task<IEnumerable<Folder>> SearchFoldersAsync(string searchTerm);
+        Task<IEnumerable<Folder>> GetFoldersByTagAsync(string tag);
         Task BatchDeleteAsync(IEnumerable<int> folderIds);
     }
 }

@@ -1,4 +1,10 @@
-﻿namespace FileManagerApp.API.DTO.Folder
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace FileManagerApp.Service.DTOs
 {
     public class FolderTreeDTO
     {

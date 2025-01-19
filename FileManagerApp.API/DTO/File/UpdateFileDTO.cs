@@ -3,6 +3,6 @@
     public class UpdateFileDTO
     {
         public string Name { get; set; }
-        public Dictionary<string, string> Metadata { get; set; }
+        public IEnumerable<string> Tags { get; set; } = new List<string>();
     }
 }

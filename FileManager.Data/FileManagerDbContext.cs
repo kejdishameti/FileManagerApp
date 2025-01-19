@@ -1,20 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data.Common;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using FileManagerApp.Domain.Entities;
-using DomainFile = FileManagerApp.Domain.Entities.File;
-using System.Text.Json.Serialization;
 using System.Text.Json;
+using DomainFile = FileManagerApp.Domain.Entities.File;
 
 namespace FileManagerApp.Data
 {
     public class FileManagerDbContext : DbContext
     {
-        public FileManagerDbContext(DbContextOptions<FileManagerDbContext> options) 
+        public FileManagerDbContext(DbContextOptions<FileManagerDbContext> options)
            : base(options)
         {
         }
@@ -29,7 +22,6 @@ namespace FileManagerApp.Data
             modelBuilder.Entity<DomainFile>(entity =>
             {
                 entity.ToTable("Files");
-
                 entity.HasKey(e => e.Id);
 
                 entity.HasOne(e => e.Folder)
@@ -37,13 +29,13 @@ namespace FileManagerApp.Data
                     .HasForeignKey(e => e.FolderId)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                // Store metadata as JSON
-                entity.Property(e => e.Metadata)
+                // Configure tags as a JSON array
+                entity.Property(e => e.Tags)
                     .HasColumnType("jsonb")
-                    .HasDefaultValueSql("'{}'::jsonb")
+                    .HasDefaultValueSql("'[]'::jsonb")
                     .HasConversion(
                         v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                        v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()) ?? new Dictionary<string, string>()
+                        v => JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>()
                     );
             });
 
@@ -51,20 +43,22 @@ namespace FileManagerApp.Data
             {
                 entity.ToTable("Folders");
                 entity.HasKey(e => e.Id);
+
                 entity.HasOne(e => e.ParentFolder)
                     .WithMany(e => e.ChildFolders)
                     .HasForeignKey(e => e.ParentFolderId)
                     .OnDelete(DeleteBehavior.Restrict);
+
                 entity.HasIndex(e => e.Path)
                     .IsUnique();
 
-                // Add metadata configuration
-                entity.Property(e => e.Metadata)
+                // Configure tags as a JSON array
+                entity.Property(e => e.Tags)
                     .HasColumnType("jsonb")
-                    .HasDefaultValueSql("'{}'::jsonb")
+                    .HasDefaultValueSql("'[]'::jsonb")
                     .HasConversion(
                         v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
-                        v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions()) ?? new Dictionary<string, string>()
+                        v => JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>()
                     );
             });
 
@@ -74,11 +68,9 @@ namespace FileManagerApp.Data
                 entity.ToTable("Users");
                 entity.HasKey(e => e.Id);
 
-
                 entity.HasIndex(e => e.Email)
                     .IsUnique();
 
-                // Configure property requirements
                 entity.Property(e => e.Email)
                     .IsRequired()
                     .HasMaxLength(255);

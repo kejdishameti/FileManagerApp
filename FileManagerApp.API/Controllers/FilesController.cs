@@ -13,20 +13,18 @@ namespace FileManagerApp.API.Controllers
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly string _storageBasePath;
-        private readonly long _maxFileSize = 100 * 1024 * 1024; // 10MB
+        private readonly long _maxFileSize = 100 * 1024 * 1024; // 100MB
         private readonly string[] _allowedTypes = new[] { "image/jpeg", "image/png", "application/pdf", "text/plain" };
 
         public FilesController(IUnitOfWork unitOfWork, IMapper mapper, IConfiguration configuration)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
-
-            // Get storage path from configuration 
             _storageBasePath = configuration["FileStorage:BasePath"];
         }
 
-        // Get api/files
-        // Retrives all files 
+        // GET: api/files
+        // Retrieves all files or files in a specific folder
         [HttpGet]
         public async Task<ActionResult<IEnumerable<FileDTO>>> GetFiles([FromQuery] int? folderId)
         {
@@ -53,7 +51,7 @@ namespace FileManagerApp.API.Controllers
                     SizeInBytes = f.SizeInBytes,
                     CreatedAt = f.CreatedAt,
                     FolderId = f.FolderId,
-                    Metadata = new Dictionary<string, string>(f.Metadata ?? new Dictionary<string, string>())
+                    Tags = f.Tags.ToList()
                 }).ToList();
 
                 Console.WriteLine($"Successfully retrieved {response.Count} files");
@@ -67,6 +65,30 @@ namespace FileManagerApp.API.Controllers
             }
         }
 
+        // GET: api/files/{id}
+        // Gets file metadata without downloading the data
+        [HttpGet("{id}")]
+        public async Task<ActionResult<FileDTO>> GetFile(int id)
+        {
+            var file = await _unitOfWork.Files.GetByIdAsync(id);
+
+            if (file == null)
+                return NotFound($"File with ID {id} not found");
+
+            var response = new FileDTO
+            {
+                Id = file.Id,
+                Name = file.Name,
+                ContentType = file.ContentType,
+                SizeInBytes = file.SizeInBytes,
+                CreatedAt = file.CreatedAt,
+                FolderId = file.FolderId,
+                Tags = file.Tags.ToList()
+            };
+
+            return Ok(response);
+        }
+
         // POST: api/files/upload
         // Handles file uploads with proper validation and error handling
         [HttpPost("upload")]
@@ -74,11 +96,10 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                // Get the uploaded file and log initial request details
                 var file = createFileDto.File;
                 Console.WriteLine($"Starting upload request - File: {file?.FileName}, FolderId: {createFileDto.FolderId}");
 
-                // Validate the incoming file
+                // Validate the file
                 if (file == null || file.Length == 0)
                     return BadRequest("No file was provided or file is empty");
 
@@ -88,21 +109,18 @@ namespace FileManagerApp.API.Controllers
                 if (!_allowedTypes.Contains(file.ContentType))
                     return BadRequest($"File type {file.ContentType} is not allowed");
 
-                // If a folder ID is provided, verify the folder exists
+                // Validate folder if specified
                 if (createFileDto.FolderId.HasValue)
                 {
                     var folder = await _unitOfWork.Folders.GetByIdAsync(createFileDto.FolderId.Value);
-                    Console.WriteLine($"Folder lookup result: {(folder != null ? "Found" : "Not Found")} for ID {createFileDto.FolderId.Value}");
-
                     if (folder == null)
                         return BadRequest($"Folder with ID {createFileDto.FolderId.Value} not found");
                 }
 
-                // Prepare the file storage location
+                // Create unique filename and prepare storage
                 string uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
                 string filePath = Path.Combine(_storageBasePath, uniqueFileName);
 
-                // Ensure the storage directory exists
                 if (!Directory.Exists(_storageBasePath))
                 {
                     Console.WriteLine($"Creating storage directory: {_storageBasePath}");
@@ -116,9 +134,8 @@ namespace FileManagerApp.API.Controllers
                     {
                         await file.CopyToAsync(stream);
                     }
-                    Console.WriteLine($"Physical file saved successfully to: {filePath}");
 
-                    // Create the file entity with initial metadata
+                    // Create and configure the file entity
                     var fileEntity = Domain.Entities.File.Create(
                         file.FileName,
                         file.ContentType,
@@ -126,32 +143,22 @@ namespace FileManagerApp.API.Controllers
                         filePath
                     );
 
-                    Console.WriteLine($"File entity created - Initial state - ID: {fileEntity.Id}, FolderId: {fileEntity.FolderId}");
-
-                    // Set the folder if specified
                     if (createFileDto.FolderId.HasValue)
                     {
                         fileEntity.MoveToFolder(createFileDto.FolderId);
-                        Console.WriteLine($"After MoveToFolder - FolderId: {fileEntity.FolderId}");
                     }
 
-                    // Add metadata if provided
-                    if (createFileDto.Metadata != null && createFileDto.Metadata.Count > 0)
+                    // Handle tags
+                    if (createFileDto.Tags != null && createFileDto.Tags.Any())
                     {
-                        foreach (var item in createFileDto.Metadata)
-                        {
-                            fileEntity.AddOrUpdateMetadata(item.Key, item.Value);
-                        }
-                        Console.WriteLine($"Added {createFileDto.Metadata.Count} metadata items");
+                        fileEntity.UpdateTags(createFileDto.Tags);
                     }
 
                     // Save to database
-                    Console.WriteLine($"Before database save - FolderId: {fileEntity.FolderId}");
                     await _unitOfWork.Files.AddAsync(fileEntity);
                     await _unitOfWork.SaveChangesAsync();
-                    Console.WriteLine($"After database save - FolderId: {fileEntity.FolderId}");
 
-                    // Prepare and return response
+                    // Prepare response
                     var response = new FileUploadResponseDTO
                     {
                         Id = fileEntity.Id,
@@ -160,23 +167,18 @@ namespace FileManagerApp.API.Controllers
                         SizeInBytes = fileEntity.SizeInBytes,
                         UploadedAt = fileEntity.CreatedAt,
                         FolderId = fileEntity.FolderId,
-                        Metadata = new Dictionary<string, string>(fileEntity.Metadata)
+                        Tags = fileEntity.Tags.ToList()
                     };
 
-                    Console.WriteLine($"Upload completed successfully - File ID: {response.Id}, FolderId: {response.FolderId}");
                     return Ok(response);
                 }
                 catch (Exception ex)
                 {
-                    // If anything fails after the physical file is created, clean it up
+                    // Clean up the physical file if something goes wrong
                     if (System.IO.File.Exists(filePath))
                     {
                         System.IO.File.Delete(filePath);
-                        Console.WriteLine($"Cleaned up physical file after error: {filePath}");
                     }
-
-                    Console.WriteLine($"Error during file processing: {ex.Message}");
-                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     throw;
                 }
             }
@@ -188,40 +190,43 @@ namespace FileManagerApp.API.Controllers
             }
         }
 
-        // Get api/files/{id}
-        // Get files metadata without downloading the data
-        [HttpGet("{id}")]
-        public async Task<ActionResult<FileDTO>> GetFile(int id)
-        {
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
-
-            if (file == null)
-                return NotFound($"File with ID {id} not found");
-
-            return Ok(_mapper.Map<FileDTO>(file));
-        }
-
-        // Put api/files/{id}
-        // Updates the file's properties 
+        // PUT: api/files/{id}
+        // Updates the file's properties
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateFile(int id, UpdateFileDTO updateFileDto)
         {
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            try
+            {
+                var file = await _unitOfWork.Files.GetByIdAsync(id);
 
-            if (file == null)
-                return NotFound($"File with ID {id} not found");
+                if (file == null)
+                    return NotFound($"File with ID {id} not found");
 
-            _mapper.Map(updateFileDto, file);
-            _unitOfWork.Files.Update(file);
-            await _unitOfWork.SaveChangesAsync();
+                if (!string.IsNullOrWhiteSpace(updateFileDto.Name))
+                {
+                    // Name update logic here if needed
+                }
 
-            return NoContent();
+                if (updateFileDto.Tags != null)
+                {
+                    file.UpdateTags(updateFileDto.Tags);
+                }
+
+                _unitOfWork.Files.Update(file);
+                await _unitOfWork.SaveChangesAsync();
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "An error occurred while updating the file");
+            }
         }
 
-        // Put api/files/{id}/metadata
-        // Updates or adds custom metadata key-value pairs for the file
-        [HttpPut("{id}/metadata")]
-        public async Task<IActionResult> UpdateFileMetadata(int id, [FromBody] UpdateFileMetadataDTO metadataDto)
+        // PUT: api/files/{id}/tags
+        // Updates file tags
+        [HttpPut("{id}/tags")]
+        public async Task<IActionResult> UpdateFileTags(int id, [FromBody] UpdateFileTagsDTO tagsDto)
         {
             try
             {
@@ -229,14 +234,7 @@ namespace FileManagerApp.API.Controllers
                 if (file == null)
                     return NotFound($"File with ID {id} not found");
 
-                Console.WriteLine($"Updating metadata for file {id} - {file.Name}");
-
-                foreach (var item in metadataDto.Metadata)
-                {
-                    file.AddOrUpdateMetadata(item.Key, item.Value);
-                    Console.WriteLine($"Added/Updated metadata: {item.Key} = {item.Value}");
-                }
-
+                file.UpdateTags(tagsDto.Tags);
                 _unitOfWork.Files.Update(file);
                 await _unitOfWork.SaveChangesAsync();
 
@@ -248,21 +246,19 @@ namespace FileManagerApp.API.Controllers
                     SizeInBytes = file.SizeInBytes,
                     CreatedAt = file.CreatedAt,
                     FolderId = file.FolderId,
-                    Metadata = new Dictionary<string, string>(file.Metadata)
+                    Tags = file.Tags.ToList()
                 };
 
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error updating file metadata: {ex.Message}");
-                return StatusCode(500, "An error occurred while updating file metadata");
+                return StatusCode(500, "An error occurred while updating file tags");
             }
         }
 
-
-        // Delete api/files/{id}
-        // Soft delete 
+        // DELETE: api/files/{id}
+        // Soft deletes a file
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteFile(int id)
         {
@@ -277,8 +273,8 @@ namespace FileManagerApp.API.Controllers
             return NoContent();
         }
 
-        // Post api/files/batch-delete
-        // Soft delete multiple files
+        // POST: api/files/batch-delete
+        // Soft deletes multiple files
         [HttpPost("batch-delete")]
         public async Task<IActionResult> BatchDeleteFiles([FromBody] BatchDeleteFilesDTO deleteDto)
         {
@@ -289,27 +285,20 @@ namespace FileManagerApp.API.Controllers
                     return BadRequest("No file IDs provided for deletion");
                 }
 
-                Console.WriteLine($"Starting batch deletion of {deleteDto.FileIds.Count} files");
-
                 await _unitOfWork.Files.BatchDeleteAsync(deleteDto.FileIds);
-
                 await _unitOfWork.SaveChangesAsync();
-
-                Console.WriteLine("Batch deletion completed successfully");
 
                 return NoContent();
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error during batch deletion: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-
                 return StatusCode(500, "An error occurred while deleting files");
             }
         }
 
-        // Get api/files/{id}/download
-        // Downloads the file with the specified ID
+        // GET: api/files/{id}/download
+        // Downloads the file
         [HttpGet("{id}/download")]
         public async Task<ActionResult> DownloadFile(int id)
         {
@@ -321,13 +310,11 @@ namespace FileManagerApp.API.Controllers
             if (!System.IO.File.Exists(file.StoragePath))
                 return NotFound("Physical file is missing");
 
-            // Stream the file 
             var fileStream = System.IO.File.OpenRead(file.StoragePath);
             return File(fileStream, file.ContentType, file.Name);
         }
 
-
-        // Put api/files/{id}/move
+        // PUT: api/files/{id}/move
         // Moves the file to a different folder
         [HttpPut("{id}/move")]
         public async Task<IActionResult> MoveFile(int id, [FromBody] MoveFileDTO moveFileDto)
@@ -347,30 +334,22 @@ namespace FileManagerApp.API.Controllers
             file.MoveToFolder(moveFileDto.NewFolderId);
             _unitOfWork.Files.Update(file);
             await _unitOfWork.SaveChangesAsync();
-            
+
             return NoContent();
         }
 
-        // Get api/files/search
-        // Searches files by name or metadata
+        // GET: api/files/search
+        // Searches files by name or tags
         [HttpGet("search")]
         public async Task<ActionResult<IEnumerable<FileDTO>>> SearchFiles([FromQuery] string term)
         {
             try
             {
-                // Log the start of the search operation
-                Console.WriteLine($"Starting search operation with term: {term}");
-
                 if (string.IsNullOrWhiteSpace(term))
                     return BadRequest("Search term cannot be empty");
 
-                // Log before calling the repository
-                Console.WriteLine("Calling repository SearchFilesAsync method");
                 var files = await _unitOfWork.Files.SearchFilesAsync(term);
-                Console.WriteLine($"Repository returned {files?.Count() ?? 0} files");
 
-                // Log the mapping operation
-                Console.WriteLine("Starting to map files to DTOs");
                 var response = files.Select(f => new FileDTO
                 {
                     Id = f.Id,
@@ -379,23 +358,14 @@ namespace FileManagerApp.API.Controllers
                     SizeInBytes = f.SizeInBytes,
                     CreatedAt = f.CreatedAt,
                     FolderId = f.FolderId,
-                    Metadata = new Dictionary<string, string>(f.Metadata ?? new Dictionary<string, string>())
+                    Tags = f.Tags.ToList()
                 }).ToList();
-                Console.WriteLine($"Successfully mapped {response.Count} files to DTOs");
 
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                // Enhanced error logging
-                Console.WriteLine($"Error details:");
-                Console.WriteLine($"Message: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                if (ex.InnerException != null)
-                {
-                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
-                    Console.WriteLine($"Inner exception stack trace: {ex.InnerException.StackTrace}");
-                }
+                Console.WriteLine($"Error details: {ex.Message}");
                 return StatusCode(500, "An error occurred while searching files");
             }
         }

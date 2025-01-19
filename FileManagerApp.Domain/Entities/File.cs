@@ -1,10 +1,5 @@
 ﻿using FileManagerApp.Domain.Enums;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using FileManagerApp.Domain.ValidationAttributes;
 
 namespace FileManagerApp.Domain.Entities
@@ -26,63 +21,69 @@ namespace FileManagerApp.Domain.Entities
         public long SizeInBytes { get; private set; }
         public FileStatus Status { get; private set; }
 
-
         public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
         public DateTime? ModifiedAt { get; private set; }
         public bool IsDeleted { get; private set; }
         public DateTime? DeletedAt { get; private set; }
 
-
-        // Relationship with folders - a file belongs in one folder
+        // Relationship with folders
         public int? FolderId { get; private set; }
         public virtual Folder Folder { get; private set; }
 
-        // Method to move the file to a different folder
+        // New property for tags
+        private List<string> _tags = new();
+        public IReadOnlyCollection<string> Tags => _tags.AsReadOnly();
+
         public void MoveToFolder(int? folderId)
         {
             FolderId = folderId;
             ModifiedAt = DateTime.UtcNow;
         }
 
-        // Additional file information stored as key-value pairs
-        private Dictionary<string, string> _metadata = new();
-        public Dictionary<string, string> Metadata
+        // New methods for tag management
+        public void AddTag(string tag)
         {
-            get => _metadata;
-            private set => _metadata = value ?? new Dictionary<string, string>();
-        }
+            if (string.IsNullOrWhiteSpace(tag))
+                throw new ArgumentException("Tag cannot be empty");
 
-
-        public void AddOrUpdateMetadata(string key, string value)
-        {
-            var normalizedKey = key.Trim().ToLower();
-
-            if (string.IsNullOrWhiteSpace(value))
+            var normalizedTag = tag.Trim().ToLower();
+            if (!_tags.Contains(normalizedTag))
             {
-                _metadata.Remove(normalizedKey);
-                return;
+                _tags.Add(normalizedTag);
+                ModifiedAt = DateTime.UtcNow;
             }
-            
-            _metadata[normalizedKey] = value.Trim();
-            ModifiedAt = DateTime.UtcNow;
         }
 
-        public string GetMetadataValue(string key)
+        public void RemoveTag(string tag)
         {
-            var normalizedKey = key.Trim().ToLower();
-            return _metadata.TryGetValue(normalizedKey, out var value) ? value : null;
-        }
-
-        public void RemoveMetadata(string key)
-        {
-            var normalizedKey = key.Trim().ToLower();
-            if (_metadata.Remove(normalizedKey))
+            var normalizedTag = tag.Trim().ToLower();
+            if (_tags.Remove(normalizedTag))
             {
                 ModifiedAt = DateTime.UtcNow;
             }
         }
 
-        // Private constructor for Entity Framework
+        public void ClearTags()
+        {
+            if (_tags.Any())
+            {
+                _tags.Clear();
+                ModifiedAt = DateTime.UtcNow;
+            }
+        }
+
+        public void UpdateTags(IEnumerable<string> tags)
+        {
+            if (tags == null)
+                throw new ArgumentNullException(nameof(tags));
+
+            _tags = tags.Select(t => t.Trim().ToLower())
+                       .Where(t => !string.IsNullOrWhiteSpace(t))
+                       .Distinct()
+                       .ToList();
+            ModifiedAt = DateTime.UtcNow;
+        }
+
         private File() { }
 
         public static File Create(string name, string contentType, long sizeInBytes, string storagePath)
@@ -90,7 +91,7 @@ namespace FileManagerApp.Domain.Entities
             if (string.IsNullOrEmpty(name))
                 throw new ArgumentException("File must have a name");
 
-            var file = new File
+            return new File
             {
                 Name = name,
                 ContentType = contentType,
@@ -99,12 +100,8 @@ namespace FileManagerApp.Domain.Entities
                 CreatedAt = DateTime.UtcNow,
                 Status = FileStatus.Processing
             };
-            
-            return file;
-            
         }
 
-        // Methods to change the file's status
         public void MarkAsActive()
         {
             Status = FileStatus.Active;

@@ -15,10 +15,11 @@ namespace FileManagerApp.Data
         // Method to add data layer services to the dependency service container
         public static IServiceCollection AddDataLayer(this IServiceCollection services)
         {
-            
+
             // Add the repositories
             services.AddScoped<IFileRepository, FileRepository>();
             services.AddScoped<IFolderRepository, FolderRepository>();
+            services.AddScoped<IUserRepository, UserRepository>();
 
             // Add the unit of work
             services.AddScoped<IUnitOfWork, UnitOfWork.UnitOfWork>();
