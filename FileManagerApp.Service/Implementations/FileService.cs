@@ -173,5 +173,50 @@ namespace FileManagerApp.Service.Implementations
 
             return await _unitOfWork.Files.GetFilesByTagAsync(tag);
         }
+
+        public async Task<DomainFile> CopyFileAsync(int sourceFileId, int targetFolderId)
+        {
+            var sourceFile = await _unitOfWork.Files.GetByIdAsync(sourceFileId);
+            if (sourceFile == null)
+                throw new ArgumentException($"File with ID {sourceFileId} not found");
+
+            var targetFolder = await _unitOfWork.Folders.GetByIdAsync(targetFolderId);
+            if (targetFolder == null)
+                throw new ArgumentException($"Target folder with ID {targetFolderId} not found");
+
+            string newFileName = $"Copy of {sourceFile.Name}";
+
+            string uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(newFileName)}";
+            string newFilePath = Path.Combine(_storageBasePath, uniqueFileName);
+
+            try
+            {
+                System.IO.File.Copy(sourceFile.StoragePath, newFilePath);
+
+                var newFile = DomainFile.Create(
+                    newFileName,
+                    sourceFile.ContentType,
+                    new FileInfo(newFilePath).Length,
+                    newFilePath
+                );
+
+                newFile.MoveToFolder(targetFolderId);
+
+                newFile.UpdateTags(sourceFile.Tags);
+
+                await _unitOfWork.Files.AddAsync(newFile);
+                await _unitOfWork.SaveChangesAsync();
+
+                return newFile;
+            }
+            catch
+            {
+                if (System.IO.File.Exists(newFilePath))
+                {
+                    System.IO.File.Delete(newFilePath);
+                }
+                throw;
+            }
+        }
     }
 }

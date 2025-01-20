@@ -6,9 +6,11 @@ using FileManagerApp.Domain.Entities;
 using FileManagerApp.Service.Implementations;
 using FileManagerApp.Service.Interfaces;
 using FileManagerApp.Service.DTOs;
+using Microsoft.AspNetCore.Authorization;
 
 namespace FileManagerApp.API.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class FoldersController : BaseApiController
@@ -337,14 +339,14 @@ namespace FileManagerApp.API.Controllers
         // GET: api/folders/search
         // Searches for folders by name, path, or tags
         [HttpGet("search")]
-        public async Task<ActionResult<IEnumerable<FolderDTO>>> SearchFolders([FromQuery] FolderSearchDTO searchDto)
+        public async Task<ActionResult<IEnumerable<FolderDTO>>> SearchFolders([FromQuery] string searchTerm)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(searchDto.SearchTerm))
+                if (string.IsNullOrWhiteSpace(searchTerm))
                     return BadRequest("Search term cannot be empty");
 
-                var folders = await _unitOfWork.Folders.SearchFoldersAsync(searchDto.SearchTerm);
+                var folders = await _unitOfWork.Folders.SearchFoldersAsync(searchTerm);
                 var response = folders.Select(f => new FolderDTO
                 {
                     Id = f.Id,

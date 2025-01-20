@@ -163,15 +163,18 @@ namespace FileManagerApp.Data.Repositories
                 searchTerm = searchTerm.ToLower();
 
                 var folders = await _context.Folders
-                    .Where(f => !f.IsDeleted &&
-                           (f.Name.ToLower().Contains(searchTerm) ||
-                            f.Path.ToLower().Contains(searchTerm) ||
-                            f.Tags.Any(t => t.ToLower().Contains(searchTerm)))
-                    )
-                    .OrderBy(f => f.Path)
+                    .Where(f => !f.IsDeleted)
+                    .AsNoTracking()
                     .ToListAsync();
 
-                return folders;
+                return folders
+                    .Where(f =>
+                        f.Name.ToLower().Contains(searchTerm) ||
+                        f.Path.ToLower().Contains(searchTerm) ||
+                        f.Tags.Any(t => t.ToLower().Contains(searchTerm)))
+                    .DistinctBy(f => f.Id)  
+                    .OrderBy(f => f.Path)
+                    .ToList();
             }
             catch (Exception ex)
             {

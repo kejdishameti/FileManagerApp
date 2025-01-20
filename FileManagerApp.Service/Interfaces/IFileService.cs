@@ -18,5 +18,6 @@ namespace FileManagerApp.Service.Interfaces
         Task<DomainFile> UpdateFileAsync(int id, string newName, IEnumerable<string> tags);
         Task<bool> MoveFileAsync(int id, int? newFolderId);
         Task<Stream> DownloadFileAsync(int id);
+        Task<DomainFile> CopyFileAsync(int sourceFileId, int targetFolderId);
     }
 }

@@ -3,9 +3,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using AutoMapper;
 using FileManagerApp.API.DTO.File;
+using Microsoft.AspNetCore.Authorization;
+using FileManagerApp.Service.Interfaces;
 
 namespace FileManagerApp.API.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class FilesController : BaseApiController
@@ -15,12 +18,14 @@ namespace FileManagerApp.API.Controllers
         private readonly string _storageBasePath;
         private readonly long _maxFileSize = 100 * 1024 * 1024; // 100MB
         private readonly string[] _allowedTypes = new[] { "image/jpeg", "image/png", "application/pdf", "text/plain" };
+        private readonly IFileService _fileService;
 
-        public FilesController(IUnitOfWork unitOfWork, IMapper mapper, IConfiguration configuration)
+        public FilesController(IUnitOfWork unitOfWork, IMapper mapper, IConfiguration configuration, IFileService fileService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _storageBasePath = configuration["FileStorage:BasePath"];
+            _fileService = fileService;
         }
 
         // GET: api/files
@@ -367,6 +372,37 @@ namespace FileManagerApp.API.Controllers
             {
                 Console.WriteLine($"Error details: {ex.Message}");
                 return StatusCode(500, "An error occurred while searching files");
+            }
+        }
+
+        [HttpPost("{id}/copy")]
+        public async Task<ActionResult<FileDTO>> CopyFile(int id, [FromBody] CopyFileDTO copyFileDto)
+        {
+            try
+            {
+                var copiedFile = await _fileService.CopyFileAsync(id, copyFileDto.TargetFolderId);
+
+                var response = new FileDTO
+                {
+                    Id = copiedFile.Id,
+                    Name = copiedFile.Name,
+                    ContentType = copiedFile.ContentType,
+                    SizeInBytes = copiedFile.SizeInBytes,
+                    CreatedAt = copiedFile.CreatedAt,
+                    FolderId = copiedFile.FolderId,
+                    Tags = copiedFile.Tags.ToList()
+                };
+
+                return Ok(response);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error copying file: {ex.Message}");
+                return StatusCode(500, "An error occurred while copying the file");
             }
         }
     }
