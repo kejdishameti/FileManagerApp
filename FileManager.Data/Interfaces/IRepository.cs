@@ -25,6 +25,7 @@ namespace FileManagerApp.Data.Interfaces
         Task<IEnumerable<DomainFile>> SearchFilesAsync(string searchTerm);
         Task<IEnumerable<DomainFile>> GetFilesByTagAsync(string tag);
         Task BatchDeleteAsync(IEnumerable<int> fileIds);
+        Task<IEnumerable<DomainFile>> GetFavoriteFilesAsync();
 
     }
 

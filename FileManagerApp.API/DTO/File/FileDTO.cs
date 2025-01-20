@@ -10,5 +10,6 @@
         public DateTime CreatedAt { get; set; }
         public int? FolderId { get; set; }
         public IEnumerable<string> Tags { get; set; } = new List<string>();
+        public bool IsFavorite { get; set; }
     }
 }

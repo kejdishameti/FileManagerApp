@@ -218,5 +218,23 @@ namespace FileManagerApp.Service.Implementations
                 throw;
             }
         }
+
+        public async Task<DomainFile> ToggleFavoriteAsync(int fileId)
+        {
+            var file = await _unitOfWork.Files.GetByIdAsync(fileId);
+            if (file == null)
+                throw new ArgumentException($"File with ID {fileId} not found");
+
+            file.ToggleFavorite();
+            _unitOfWork.Files.Update(file);
+            await _unitOfWork.SaveChangesAsync();
+
+            return file;
+        }
+
+        public async Task<IEnumerable<DomainFile>> GetFavoriteFilesAsync()
+        {
+            return await _unitOfWork.Files.GetFavoriteFilesAsync();
+        }
     }
 }

@@ -33,6 +33,7 @@ namespace FileManagerApp.Domain.Entities
         // New property for tags
         private List<string> _tags = new();
         public IReadOnlyCollection<string> Tags => _tags.AsReadOnly();
+        public bool IsFavorite { get; private set; }
 
         public void MoveToFolder(int? folderId)
         {
@@ -81,6 +82,12 @@ namespace FileManagerApp.Domain.Entities
                        .Where(t => !string.IsNullOrWhiteSpace(t))
                        .Distinct()
                        .ToList();
+            ModifiedAt = DateTime.UtcNow;
+        }
+
+        public void ToggleFavorite()
+        {
+            IsFavorite = !IsFavorite;
             ModifiedAt = DateTime.UtcNow;
         }
 

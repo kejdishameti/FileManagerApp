@@ -405,5 +405,67 @@ namespace FileManagerApp.API.Controllers
                 return StatusCode(500, "An error occurred while copying the file");
             }
         }
+
+        // PUT: api/files/{id}/favorite
+        // Toggles the favorite status of a file
+        [HttpPut("{id}/favorite")]
+        public async Task<ActionResult<FileDTO>> ToggleFavorite(int id)
+        {
+            try
+            {
+                var file = await _fileService.ToggleFavoriteAsync(id);
+
+                var response = new FileDTO
+                {
+                    Id = file.Id,
+                    Name = file.Name,
+                    ContentType = file.ContentType,
+                    SizeInBytes = file.SizeInBytes,
+                    CreatedAt = file.CreatedAt,
+                    FolderId = file.FolderId,
+                    Tags = file.Tags.ToList(),
+                    IsFavorite = file.IsFavorite  
+                };
+
+                return Ok(response);
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "An error occurred while toggling favorite status");
+            }
+        }
+
+        // GET: api/files/favorites
+        // Retrieves all favorite files
+        [HttpGet("favorites")]
+        public async Task<ActionResult<IEnumerable<FileDTO>>> GetFavorites()
+        {
+            try
+            {
+                var favorites = await _fileService.GetFavoriteFilesAsync();
+
+                var response = favorites.Select(f => new FileDTO
+                {
+                    Id = f.Id,
+                    Name = f.Name,
+                    ContentType = f.ContentType,
+                    SizeInBytes = f.SizeInBytes,
+                    CreatedAt = f.CreatedAt,
+                    FolderId = f.FolderId,
+                    Tags = f.Tags.ToList(),
+                    IsFavorite = f.IsFavorite
+                });
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "An error occurred while retrieving favorite files");
+            }
+        }
     }
 }

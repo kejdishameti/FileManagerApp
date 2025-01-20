@@ -19,5 +19,7 @@ namespace FileManagerApp.Service.Interfaces
         Task<bool> MoveFileAsync(int id, int? newFolderId);
         Task<Stream> DownloadFileAsync(int id);
         Task<DomainFile> CopyFileAsync(int sourceFileId, int targetFolderId);
+        Task<DomainFile> ToggleFavoriteAsync(int fileId);
+        Task<IEnumerable<DomainFile>> GetFavoriteFilesAsync();
     }
 }

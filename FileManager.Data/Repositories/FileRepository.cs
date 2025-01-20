@@ -111,5 +111,13 @@ namespace FileManagerApp.Data.Repositories
                 .AsNoTracking()
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<DomainFile>> GetFavoriteFilesAsync()
+        {
+            return await _context.Files
+                .Where(f => !f.IsDeleted && f.IsFavorite)
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }
