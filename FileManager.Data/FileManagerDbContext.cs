@@ -65,6 +65,11 @@ namespace FileManagerApp.Data
                         v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                         v => JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>()
                     );
+
+                // Configure the IsFavorite property
+                entity.Property(e => e.IsFavorite)
+                    .HasColumnType("boolean")
+                    .HasDefaultValue(false);
             });
 
             // Configure the User entity

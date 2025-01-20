@@ -205,5 +205,14 @@ namespace FileManagerApp.Data.Repositories
                 throw;
             }
         }
+
+        public async Task<IEnumerable<Folder>> GetFavoriteFoldersAsync()
+        {
+            return await _context.Folders
+                .Where(f => !f.IsDeleted && f.IsFavorite)
+                .OrderBy(f => f.Path)
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }

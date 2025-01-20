@@ -36,5 +36,6 @@ namespace FileManagerApp.Data.Interfaces
         Task<IEnumerable<Folder>> SearchFoldersAsync(string searchTerm);
         Task<IEnumerable<Folder>> GetFoldersByTagAsync(string tag);
         Task BatchDeleteAsync(IEnumerable<int> folderIds);
+        Task<IEnumerable<Folder>> GetFavoriteFoldersAsync();
     }
 }

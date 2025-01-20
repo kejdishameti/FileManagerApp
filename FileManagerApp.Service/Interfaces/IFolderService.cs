@@ -17,5 +17,7 @@ namespace FileManagerApp.Service.Interfaces
         Task<Folder> UpdateFolderAsync(int id, string newName);
         Task<IEnumerable<Folder>> GetChildFoldersAsync(int parentId);
         Task<IEnumerable<FolderTreeDTO>> GetFolderTreeAsync();
+        Task<Folder> ToggleFavoriteAsync(int folderId);
+        Task<IEnumerable<Folder>> GetFavoriteFoldersAsync();
     }
 }

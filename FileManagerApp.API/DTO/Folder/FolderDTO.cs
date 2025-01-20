@@ -8,5 +8,6 @@
         public DateTime CreatedAt { get; set; }
         public int? ParentFolderId { get; set; }
         public IEnumerable<string> Tags { get; set; } = new List<string>();
+        public bool IsFavorite { get; set; }
     }
 }

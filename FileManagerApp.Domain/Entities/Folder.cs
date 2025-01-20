@@ -35,6 +35,15 @@ namespace FileManagerApp.Domain.Entities
         private List<string> _tags = new();
         public IReadOnlyCollection<string> Tags => _tags.AsReadOnly();
 
+        public bool IsFavorite { get; private set; }
+
+        // Method to control favorite status
+        public void ToggleFavorite()
+        {
+            IsFavorite = !IsFavorite;
+            ModifiedAt = DateTime.UtcNow;
+        }
+
         public void SetPath(string parentPath = "")
         {
             Path = string.IsNullOrEmpty(parentPath)

@@ -130,5 +130,23 @@ namespace FileManagerApp.Service.Implementations
 
             return dto;
         }
+
+        public async Task<Folder> ToggleFavoriteAsync(int folderId)
+        {
+            var folder = await _unitOfWork.Folders.GetByIdAsync(folderId);
+            if (folder == null)
+                throw new ArgumentException($"Folder with ID {folderId} not found");
+
+            folder.ToggleFavorite();
+            _unitOfWork.Folders.Update(folder);
+            await _unitOfWork.SaveChangesAsync();
+
+            return folder;
+        }
+
+        public async Task<IEnumerable<Folder>> GetFavoriteFoldersAsync()
+        {
+            return await _unitOfWork.Folders.GetFavoriteFoldersAsync();
+        }
     }
 }

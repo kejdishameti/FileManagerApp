@@ -365,5 +365,63 @@ namespace FileManagerApp.API.Controllers
                 return StatusCode(500, "An error occurred while searching folders");
             }
         }
+
+        // PUT: api/folders/{id}/favorite
+        [HttpPut("{id}/favorite")]
+        public async Task<ActionResult<FolderDTO>> ToggleFavorite(int id)
+        {
+            try
+            {
+                var folder = await _folderService.ToggleFavoriteAsync(id);
+
+                var response = new FolderDTO
+                {
+                    Id = folder.Id,
+                    Name = folder.Name,
+                    Path = folder.Path,
+                    CreatedAt = folder.CreatedAt,
+                    ParentFolderId = folder.ParentFolderId,
+                    Tags = folder.Tags.ToList(),
+                    IsFavorite = folder.IsFavorite  
+                };
+
+                return Ok(response);
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "An error occurred while toggling favorite status");
+            }
+        }
+
+        // GET: api/folders/favorites
+        [HttpGet("favorites")]
+        public async Task<ActionResult<IEnumerable<FolderDTO>>> GetFavorites()
+        {
+            try
+            {
+                var favorites = await _folderService.GetFavoriteFoldersAsync();
+
+                var response = favorites.Select(f => new FolderDTO
+                {
+                    Id = f.Id,
+                    Name = f.Name,
+                    Path = f.Path,
+                    CreatedAt = f.CreatedAt,
+                    ParentFolderId = f.ParentFolderId,
+                    Tags = f.Tags.ToList(),
+                    IsFavorite = f.IsFavorite
+                });
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "An error occurred while retrieving favorite folders");
+            }
+        }
     }
 }
