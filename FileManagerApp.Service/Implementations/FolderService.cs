@@ -32,7 +32,7 @@ namespace FileManagerApp.Service.Implementations
             return await _unitOfWork.Folders.GetAllAsync();
         }
 
-        public async Task<Folder> CreateFolderAsync(string name, int? parentFolderId)
+        public async Task<Folder> CreateFolderAsync(string name, int? parentFolderId, IEnumerable<string> tags)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Folder name cannot be empty.");
@@ -48,6 +48,8 @@ namespace FileManagerApp.Service.Implementations
 
             var folder = Folder.Create(name, parentFolderId);
             folder.SetPath(parentPath);
+
+            folder.UpdateTags(tags ?? new List<string>());
 
             await _unitOfWork.Folders.AddAsync(folder);
             await _unitOfWork.SaveChangesAsync();

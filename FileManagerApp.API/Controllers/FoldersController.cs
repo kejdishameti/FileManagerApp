@@ -63,28 +63,11 @@ namespace FileManagerApp.API.Controllers
                 if (string.IsNullOrWhiteSpace(createFolderDto.Name))
                     return BadRequest("Folder name cannot be empty.");
 
-                string parentPath = "";
-
-                if (createFolderDto.ParentFolderId.HasValue)
-                {
-                    var parentFolder = await _unitOfWork.Folders.GetByIdAsync(createFolderDto.ParentFolderId.Value);
-                    if (parentFolder == null)
-                        return BadRequest("Parent folder not found");
-
-                    parentPath = parentFolder.Path;
-                }
-
-                var folder = Folder.Create(createFolderDto.Name, createFolderDto.ParentFolderId);
-                folder.SetPath(parentPath);
-
-                // Add initial tags if provided
-                if (createFolderDto.Tags != null && createFolderDto.Tags.Any())
-                {
-                    folder.UpdateTags(createFolderDto.Tags);
-                }
-
-                await _unitOfWork.Folders.AddAsync(folder);
-                await _unitOfWork.SaveChangesAsync();
+                var folder = await _folderService.CreateFolderAsync(
+                    createFolderDto.Name,
+                    createFolderDto.ParentFolderId,
+                    createFolderDto.Tags
+                );
 
                 var response = new FolderDTO
                 {

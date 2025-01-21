@@ -12,7 +12,7 @@ namespace FileManagerApp.Service.Interfaces
     {
         Task<Folder> GetFolderByIdAsync(int id);
         Task<IEnumerable<Folder>> GetAllFoldersAsync();
-        Task<Folder> CreateFolderAsync(string name, int? parentFolderId);
+        Task<Folder> CreateFolderAsync(string name, int? parentFolderId, IEnumerable<string> tags);
         Task<bool> DeleteFolderAsync(int id);
         Task<Folder> UpdateFolderAsync(int id, string newName);
         Task<IEnumerable<Folder>> GetChildFoldersAsync(int parentId);
