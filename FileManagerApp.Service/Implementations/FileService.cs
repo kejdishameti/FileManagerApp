@@ -42,7 +42,7 @@ namespace FileManagerApp.Service.Implementations
             return await _unitOfWork.Files.GetFilesByFolderIdAsync(folderId);
         }
 
-        public async Task<DomainFile> UploadFileAsync(IFormFile file, int? folderId, IEnumerable<string> tags)
+        public async Task<DomainFile> UploadFileAsync(IFormFile file, int? folderId = null, IEnumerable<string>? tags = null)
         {
             if (file == null || file.Length == 0)
                 throw new ArgumentException("No file was provided or file is empty");
@@ -62,7 +62,6 @@ namespace FileManagerApp.Service.Implementations
 
             string uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
             string filePath = Path.Combine(_storageBasePath, uniqueFileName);
-
             Directory.CreateDirectory(_storageBasePath);
 
             try
@@ -80,9 +79,11 @@ namespace FileManagerApp.Service.Implementations
                 );
 
                 if (folderId.HasValue)
+                {
                     fileEntity.MoveToFolder(folderId);
+                }
 
-                fileEntity.UpdateTags(tags ?? new List<string>());
+                fileEntity.UpdateTags(tags ?? Enumerable.Empty<string>());
 
                 await _unitOfWork.Files.AddAsync(fileEntity);
                 await _unitOfWork.SaveChangesAsync();
@@ -92,7 +93,9 @@ namespace FileManagerApp.Service.Implementations
             catch
             {
                 if (System.IO.File.Exists(filePath))
+                {
                     System.IO.File.Delete(filePath);
+                }
                 throw;
             }
         }
@@ -119,6 +122,22 @@ namespace FileManagerApp.Service.Implementations
             {
                 file.UpdateTags(tags);
             }
+
+            _unitOfWork.Files.Update(file);
+            await _unitOfWork.SaveChangesAsync();
+            return file;
+        }
+
+        public async Task<DomainFile> RenameFileAsync(int id, string newName)
+        {
+            if (string.IsNullOrWhiteSpace(newName))
+                throw new ArgumentException("New file name cannot be empty");
+
+            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            if (file == null)
+                throw new ArgumentException($"File with ID {id} not found");
+
+            file.Rename(newName);
 
             _unitOfWork.Files.Update(file);
             await _unitOfWork.SaveChangesAsync();

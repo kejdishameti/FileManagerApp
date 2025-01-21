@@ -55,7 +55,7 @@ namespace FileManagerApp.API.Controllers
 
         // POST: api/folders
         // Creates a new folder
-        [HttpPost]
+        [HttpPost("create")]
         public async Task<ActionResult<FolderDTO>> CreateFolder(CreateFolderDTO createFolderDto)
         {
             try
@@ -76,7 +76,8 @@ namespace FileManagerApp.API.Controllers
                     Path = folder.Path,
                     CreatedAt = folder.CreatedAt,
                     ParentFolderId = folder.ParentFolderId,
-                    Tags = folder.Tags.ToList()
+                    Tags = folder.Tags.ToList(),
+                    IsFavorite = folder.IsFavorite
                 };
 
                 return CreatedAtAction(nameof(GetFolder), new { id = folder.Id }, response);
@@ -85,6 +86,39 @@ namespace FileManagerApp.API.Controllers
             {
                 Console.WriteLine($"Error creating folder: {ex.Message}");
                 return BadRequest($"Could not create folder: {ex.Message}");
+            }
+        }
+
+        [HttpPost("upload")]
+        public async Task<ActionResult<FolderUploadResponseDTO>> UploadFolder([FromForm] FolderUploadDTO uploadDto)
+        {
+            try
+            {
+                if (uploadDto.Files == null || uploadDto.Files.Count == 0)
+                    return BadRequest("No files were provided.");
+
+                (Folder rootFolder, IEnumerable<Domain.Entities.File> uploadedFiles) = await _folderService.UploadFolderAsync(
+                    uploadDto.Files,
+                    uploadDto.ParentFolderId,
+                    uploadDto.Tags  
+                );
+
+                var response = new FolderUploadResponseDTO
+                {
+                    FolderId = rootFolder.Id,
+                    FolderName = rootFolder.Name,
+                    Path = rootFolder.Path,
+                    TotalFiles = uploadedFiles.Count(),
+                    TotalSize = uploadedFiles.Sum(f => f.SizeInBytes),
+                    CreatedFolders = uploadedFiles.Select(f => f.Folder?.Path ?? "").Distinct()
+                };
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error uploading folder: {ex.Message}");
+                return BadRequest($"Could not upload folder: {ex.Message}");
             }
         }
 
@@ -112,34 +146,37 @@ namespace FileManagerApp.API.Controllers
         }
 
         // PUT: api/folders/{id}
-        // Updates folder properties
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateFolder(int id, UpdateFolderDTO updateFolderDto)
+        // Updates folder name
+        [HttpPut("{id}/rename")]
+        public async Task<IActionResult> RenameFolder(int id, [FromBody] RenameFolderDTO renameDto)
         {
             try
             {
-                var folder = await _unitOfWork.Folders.GetByIdAsync(id);
-                if (folder == null)
-                    return NotFound($"Folder with ID {id} not found");
+                // Validate the DTO
+                if (string.IsNullOrWhiteSpace(renameDto.NewName))
+                    return BadRequest("Folder name cannot be empty");
 
-                if (!string.IsNullOrWhiteSpace(updateFolderDto.Name))
+                var folder = await _folderService.RenameFolderAsync(id, renameDto.NewName);
+
+                var response = new FolderDTO
                 {
-                    // Handle name update if needed
-                }
+                    Id = folder.Id,
+                    Name = folder.Name,
+                    Path = folder.Path,
+                    CreatedAt = folder.CreatedAt,
+                    ParentFolderId = folder.ParentFolderId,
+                    Tags = folder.Tags.ToList()
+                };
 
-                if (updateFolderDto.Tags != null)
-                {
-                    folder.UpdateTags(updateFolderDto.Tags);
-                }
-
-                _unitOfWork.Folders.Update(folder);
-                await _unitOfWork.SaveChangesAsync();
-
-                return NoContent();
+                return Ok(response);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while updating the folder");
+                return StatusCode(500, "An error occurred while renaming the folder");
             }
         }
 

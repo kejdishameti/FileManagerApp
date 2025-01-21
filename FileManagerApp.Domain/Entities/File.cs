@@ -109,6 +109,21 @@ namespace FileManagerApp.Domain.Entities
             };
         }
 
+        public void Rename(string newName)
+        {
+            if (string.IsNullOrWhiteSpace(newName))
+                throw new ArgumentException("File name cannot be empty");
+
+            string currentExtension = Path.GetExtension(Name);
+
+            bool hasNewExtension = Path.HasExtension(newName);
+
+            string finalName = hasNewExtension ? newName : newName + currentExtension;
+
+            Name = finalName;
+            ModifiedAt = DateTime.UtcNow;
+        }
+
         public void MarkAsActive()
         {
             Status = FileStatus.Active;

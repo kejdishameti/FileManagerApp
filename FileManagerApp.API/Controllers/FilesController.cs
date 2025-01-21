@@ -120,60 +120,24 @@ namespace FileManagerApp.API.Controllers
                         return BadRequest($"Folder with ID {createFileDto.FolderId.Value} not found");
                 }
 
-                string uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
-                string filePath = Path.Combine(_storageBasePath, uniqueFileName);
+                var uploadedFile = await _fileService.UploadFileAsync(
+                    file,
+                    createFileDto.FolderId,  
+                    createFileDto.Tags       
+                );
 
-                if (!Directory.Exists(_storageBasePath))
+                var response = new FileUploadResponseDTO
                 {
-                    Console.WriteLine($"Creating storage directory: {_storageBasePath}");
-                    Directory.CreateDirectory(_storageBasePath);
-                }
+                    Id = uploadedFile.Id,
+                    Name = uploadedFile.Name,
+                    ContentType = uploadedFile.ContentType,
+                    SizeInBytes = uploadedFile.SizeInBytes,
+                    UploadedAt = uploadedFile.CreatedAt,
+                    FolderId = uploadedFile.FolderId,
+                    Tags = uploadedFile.Tags.ToList()
+                };
 
-                try
-                {
-                    using (var stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await file.CopyToAsync(stream);
-                    }
-
-                    var fileEntity = Domain.Entities.File.Create(
-                        file.FileName,
-                        file.ContentType,
-                        file.Length,
-                        filePath
-                    );
-
-                    if (createFileDto.FolderId.HasValue)
-                    {
-                        fileEntity.MoveToFolder(createFileDto.FolderId);
-                    }
-
-                    fileEntity.UpdateTags(createFileDto.Tags ?? new List<string>());
-
-                    await _unitOfWork.Files.AddAsync(fileEntity);
-                    await _unitOfWork.SaveChangesAsync();
-
-                    var response = new FileUploadResponseDTO
-                    {
-                        Id = fileEntity.Id,
-                        Name = fileEntity.Name,
-                        ContentType = fileEntity.ContentType,
-                        SizeInBytes = fileEntity.SizeInBytes,
-                        UploadedAt = fileEntity.CreatedAt,
-                        FolderId = fileEntity.FolderId,
-                        Tags = fileEntity.Tags.ToList()
-                    };
-
-                    return Ok(response);
-                }
-                catch (Exception ex)
-                {
-                    if (System.IO.File.Exists(filePath))
-                    {
-                        System.IO.File.Delete(filePath);
-                    }
-                    throw;
-                }
+                return Ok(response);
             }
             catch (Exception ex)
             {
@@ -183,36 +147,34 @@ namespace FileManagerApp.API.Controllers
             }
         }
 
-        // PUT: api/files/{id}
-        // Updates the file's properties
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateFile(int id, UpdateFileDTO updateFileDto)
+        // PUT: api/files/{id}/rename
+        [HttpPut("{id}/rename")]
+        public async Task<ActionResult<FileDTO>> RenameFile(int id, RenameFileDTO renameFileDto)
         {
             try
             {
-                var file = await _unitOfWork.Files.GetByIdAsync(id);
+                var file = await _fileService.RenameFileAsync(id, renameFileDto.NewName);
 
-                if (file == null)
-                    return NotFound($"File with ID {id} not found");
-
-                if (!string.IsNullOrWhiteSpace(updateFileDto.Name))
+                var response = new FileDTO
                 {
-                    // Name update logic here if needed
-                }
+                    Id = file.Id,
+                    Name = file.Name,
+                    ContentType = file.ContentType,
+                    SizeInBytes = file.SizeInBytes,
+                    CreatedAt = file.CreatedAt,
+                    FolderId = file.FolderId,
+                    Tags = file.Tags.ToList()
+                };
 
-                if (updateFileDto.Tags != null)
-                {
-                    file.UpdateTags(updateFileDto.Tags);
-                }
-
-                _unitOfWork.Files.Update(file);
-                await _unitOfWork.SaveChangesAsync();
-
-                return NoContent();
+                return Ok(response);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while updating the file");
+                return StatusCode(500, "An error occurred while renaming the file");
             }
         }
 
