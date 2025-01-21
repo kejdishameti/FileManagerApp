@@ -104,7 +104,6 @@ namespace FileManagerApp.API.Controllers
                 var file = createFileDto.File;
                 Console.WriteLine($"Starting upload request - File: {file?.FileName}, FolderId: {createFileDto.FolderId}");
 
-                // Validate the file
                 if (file == null || file.Length == 0)
                     return BadRequest("No file was provided or file is empty");
 
@@ -114,7 +113,6 @@ namespace FileManagerApp.API.Controllers
                 if (!_allowedTypes.Contains(file.ContentType))
                     return BadRequest($"File type {file.ContentType} is not allowed");
 
-                // Validate folder if specified
                 if (createFileDto.FolderId.HasValue)
                 {
                     var folder = await _unitOfWork.Folders.GetByIdAsync(createFileDto.FolderId.Value);
@@ -122,7 +120,6 @@ namespace FileManagerApp.API.Controllers
                         return BadRequest($"Folder with ID {createFileDto.FolderId.Value} not found");
                 }
 
-                // Create unique filename and prepare storage
                 string uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
                 string filePath = Path.Combine(_storageBasePath, uniqueFileName);
 
@@ -134,13 +131,11 @@ namespace FileManagerApp.API.Controllers
 
                 try
                 {
-                    // Save the physical file
                     using (var stream = new FileStream(filePath, FileMode.Create))
                     {
                         await file.CopyToAsync(stream);
                     }
 
-                    // Create and configure the file entity
                     var fileEntity = Domain.Entities.File.Create(
                         file.FileName,
                         file.ContentType,
@@ -153,17 +148,11 @@ namespace FileManagerApp.API.Controllers
                         fileEntity.MoveToFolder(createFileDto.FolderId);
                     }
 
-                    // Handle tags
-                    if (createFileDto.Tags != null && createFileDto.Tags.Any())
-                    {
-                        fileEntity.UpdateTags(createFileDto.Tags);
-                    }
+                    fileEntity.UpdateTags(createFileDto.Tags ?? new List<string>());
 
-                    // Save to database
                     await _unitOfWork.Files.AddAsync(fileEntity);
                     await _unitOfWork.SaveChangesAsync();
 
-                    // Prepare response
                     var response = new FileUploadResponseDTO
                     {
                         Id = fileEntity.Id,
@@ -179,7 +168,6 @@ namespace FileManagerApp.API.Controllers
                 }
                 catch (Exception ex)
                 {
-                    // Clean up the physical file if something goes wrong
                     if (System.IO.File.Exists(filePath))
                     {
                         System.IO.File.Delete(filePath);

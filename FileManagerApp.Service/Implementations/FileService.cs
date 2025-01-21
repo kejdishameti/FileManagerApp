@@ -44,7 +44,6 @@ namespace FileManagerApp.Service.Implementations
 
         public async Task<DomainFile> UploadFileAsync(IFormFile file, int? folderId, IEnumerable<string> tags)
         {
-            // Validate file
             if (file == null || file.Length == 0)
                 throw new ArgumentException("No file was provided or file is empty");
 
@@ -54,7 +53,6 @@ namespace FileManagerApp.Service.Implementations
             if (!_allowedTypes.Contains(file.ContentType))
                 throw new ArgumentException($"File type {file.ContentType} is not allowed");
 
-            // Validate folder if provided
             if (folderId.HasValue)
             {
                 var folder = await _unitOfWork.Folders.GetByIdAsync(folderId.Value);
@@ -62,22 +60,18 @@ namespace FileManagerApp.Service.Implementations
                     throw new ArgumentException($"Folder with ID {folderId.Value} not found");
             }
 
-            // Generate unique filename and path
             string uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
             string filePath = Path.Combine(_storageBasePath, uniqueFileName);
 
-            // Ensure storage directory exists
             Directory.CreateDirectory(_storageBasePath);
 
             try
             {
-                // Save physical file
                 using (var stream = new FileStream(filePath, FileMode.Create))
                 {
                     await file.CopyToAsync(stream);
                 }
 
-                // Create file entity
                 var fileEntity = DomainFile.Create(
                     file.FileName,
                     file.ContentType,
@@ -88,11 +82,7 @@ namespace FileManagerApp.Service.Implementations
                 if (folderId.HasValue)
                     fileEntity.MoveToFolder(folderId);
 
-                // Add tags if provided
-                if (tags != null && tags.Any())
-                {
-                    fileEntity.UpdateTags(tags);
-                }
+                fileEntity.UpdateTags(tags ?? new List<string>());
 
                 await _unitOfWork.Files.AddAsync(fileEntity);
                 await _unitOfWork.SaveChangesAsync();
@@ -101,7 +91,6 @@ namespace FileManagerApp.Service.Implementations
             }
             catch
             {
-                // Clean up the physical file if something goes wrong
                 if (System.IO.File.Exists(filePath))
                     System.IO.File.Delete(filePath);
                 throw;
