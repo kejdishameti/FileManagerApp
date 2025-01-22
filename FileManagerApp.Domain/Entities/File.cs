@@ -30,6 +30,9 @@ namespace FileManagerApp.Domain.Entities
         public int? FolderId { get; private set; }
         public virtual Folder Folder { get; private set; }
 
+        // Relationship with users
+        public int UserId { get; private set; }
+
         // New property for tags
         private List<string> _tags = new();
         public IReadOnlyCollection<string> Tags => _tags.AsReadOnly();
@@ -93,7 +96,7 @@ namespace FileManagerApp.Domain.Entities
 
         private File() { }
 
-        public static File Create(string name, string contentType, long sizeInBytes, string storagePath)
+        public static File Create(string name, string contentType, long sizeInBytes, string storagePath, int userId)
         {
             if (string.IsNullOrEmpty(name))
                 throw new ArgumentException("File must have a name");
@@ -105,7 +108,8 @@ namespace FileManagerApp.Domain.Entities
                 SizeInBytes = sizeInBytes,
                 StoragePath = storagePath,
                 CreatedAt = DateTime.UtcNow,
-                Status = FileStatus.Processing
+                Status = FileStatus.Processing,
+                UserId = userId
             };
         }
 

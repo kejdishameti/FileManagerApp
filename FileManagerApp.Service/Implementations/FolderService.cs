@@ -25,20 +25,20 @@ namespace FileManagerApp.Service.Implementations
             _storageBasePath = configuration["FileStorage:BasePath"];
         }
 
-        public async Task<Folder> GetFolderByIdAsync(int id)
+        public async Task<Folder> GetFolderByIdAsync(int id, int userId)
         {
-            var folder = await _unitOfWork.Folders.GetByIdAsync(id);
+            var folder = await _unitOfWork.Folders.GetByIdAsync(id, userId);
             if (folder == null)
                 throw new ArgumentException($"Folder with ID {id} not found");
             return folder;
         }
 
-        public async Task<IEnumerable<Folder>> GetAllFoldersAsync()
+        public async Task<IEnumerable<Folder>> GetAllFoldersAsync(int userId)
         {
-            return await _unitOfWork.Folders.GetAllAsync();
+            return await _unitOfWork.Folders.GetAllAsync(userId);
         }
 
-        public async Task<Folder> CreateFolderAsync(string name, int? parentFolderId, IEnumerable<string> tags)
+        public async Task<Folder> CreateFolderAsync(string name, int userId, int? parentFolderId, IEnumerable<string> tags)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Folder name cannot be empty.");
@@ -46,13 +46,13 @@ namespace FileManagerApp.Service.Implementations
             string parentPath = "";
             if (parentFolderId.HasValue)
             {
-                var parentFolder = await _unitOfWork.Folders.GetByIdAsync(parentFolderId.Value);
+                var parentFolder = await _unitOfWork.Folders.GetByIdAsync(parentFolderId.Value, userId);
                 if (parentFolder == null)
                     throw new ArgumentException("Parent folder not found");
                 parentPath = parentFolder.Path;
             }
 
-            var folder = Folder.Create(name, parentFolderId);
+            var folder = Folder.Create(name, parentFolderId, userId);
             folder.SetPath(parentPath);
 
             folder.UpdateTags(tags ?? new List<string>());
@@ -65,6 +65,7 @@ namespace FileManagerApp.Service.Implementations
 
         public async Task<(Folder RootFolder, IEnumerable<Domain.Entities.File> Files)> UploadFolderAsync(
            IFormFileCollection files,
+           int userId,
            int? parentFolderId,
            IEnumerable<string> tags)
         {
@@ -76,7 +77,7 @@ namespace FileManagerApp.Service.Implementations
             if (string.IsNullOrWhiteSpace(rootFolderName))
                 throw new ArgumentException("Could not determine folder name from upload");
 
-            var rootFolder = await CreateFolderAsync(rootFolderName, parentFolderId, tags);
+            var rootFolder = await CreateFolderAsync(rootFolderName, userId, parentFolderId, tags);
             var uploadedFiles = new List<Domain.Entities.File>();
             var createdFolderPaths = new HashSet<string>();
 
@@ -97,6 +98,7 @@ namespace FileManagerApp.Service.Implementations
                         {
                             var subFolder = await CreateFolderAsync(
                                 pathParts[i],
+                                userId,
                                 currentParentId,
                                 new List<string>());
 
@@ -117,7 +119,8 @@ namespace FileManagerApp.Service.Implementations
                         pathParts.Last(), 
                         file.ContentType,
                         file.Length,
-                        filePath
+                        filePath,
+                        userId
                     );
 
                     fileEntity.MoveToFolder(currentParentId);
@@ -135,9 +138,9 @@ namespace FileManagerApp.Service.Implementations
             return (rootFolder, uploadedFiles);
         }
 
-        public async Task<bool> DeleteFolderAsync(int id)
+        public async Task<bool> DeleteFolderAsync(int id, int userId)
         {
-            var folder = await _unitOfWork.Folders.GetByIdAsync(id);
+            var folder = await _unitOfWork.Folders.GetByIdAsync(id, userId);
             if (folder == null) return false;
 
             folder.MarkAsDeleted();
@@ -146,16 +149,16 @@ namespace FileManagerApp.Service.Implementations
             return true;
         }
 
-        public async Task<Folder> RenameFolderAsync(int id, string newName)
+        public async Task<Folder> RenameFolderAsync(int id, string newName, int userId)
         {
             if (string.IsNullOrWhiteSpace(newName))
                 throw new ArgumentException("New folder name cannot be empty");
 
-            var folder = await _unitOfWork.Folders.GetByIdAsync(id);
+            var folder = await _unitOfWork.Folders.GetByIdAsync(id, userId);
             if (folder == null)
                 throw new ArgumentException($"Folder with ID {id} not found");
 
-            var updatedFolder = Folder.Create(newName, folder.ParentFolderId);
+            var updatedFolder = Folder.Create(newName, folder.ParentFolderId, userId:folder.UserId);
             updatedFolder.SetPath(folder.ParentFolder?.Path ?? "");
 
             _unitOfWork.Folders.Update(updatedFolder);
@@ -164,17 +167,16 @@ namespace FileManagerApp.Service.Implementations
             return updatedFolder;
         }
 
-        public async Task<IEnumerable<Folder>> GetChildFoldersAsync(int parentId)
+        public async Task<IEnumerable<Folder>> GetChildFoldersAsync(int parentId, int userId)
         {
-            return await _unitOfWork.Folders.GetChildFoldersByParentIdAsync(parentId);
+            return await _unitOfWork.Folders.GetChildFoldersByParentIdAsync(parentId, userId);
         }
 
-        public async Task<IEnumerable<FolderTreeDTO>> GetFolderTreeAsync()
+        public async Task<IEnumerable<FolderTreeDTO>> GetFolderTreeAsync(int userId)
         {
             try
             {
-                // Get all folders in a single database query
-                var allFolders = (await _unitOfWork.Folders.GetAllAsync()).ToList();
+                var allFolders = (await _unitOfWork.Folders.GetAllAsync(userId)).ToList();
 
                 // Find root folders (those without parents)
                 var rootFolders = allFolders.Where(f => !f.ParentFolderId.HasValue).ToList();
@@ -211,9 +213,9 @@ namespace FileManagerApp.Service.Implementations
             return dto;
         }
 
-        public async Task<Folder> ToggleFavoriteAsync(int folderId)
+        public async Task<Folder> ToggleFavoriteAsync(int folderId, int userId)
         {
-            var folder = await _unitOfWork.Folders.GetByIdAsync(folderId);
+            var folder = await _unitOfWork.Folders.GetByIdAsync(folderId, userId);
             if (folder == null)
                 throw new ArgumentException($"Folder with ID {folderId} not found");
 
@@ -224,9 +226,9 @@ namespace FileManagerApp.Service.Implementations
             return folder;
         }
 
-        public async Task<IEnumerable<Folder>> GetFavoriteFoldersAsync()
+        public async Task<IEnumerable<Folder>> GetFavoriteFoldersAsync(int userId)
         {
-            return await _unitOfWork.Folders.GetFavoriteFoldersAsync();
+            return await _unitOfWork.Folders.GetFavoriteFoldersAsync(userId);
         }
     }
 }

@@ -11,18 +11,19 @@ namespace FileManagerApp.Service.Interfaces
 {
     public interface IFolderService
     {
-        Task<Folder> GetFolderByIdAsync(int id);
-        Task<IEnumerable<Folder>> GetAllFoldersAsync();
-        Task<Folder> CreateFolderAsync(string name, int? parentFolderId, IEnumerable<string> tags);
+        Task<Folder> GetFolderByIdAsync(int id, int userId);
+        Task<IEnumerable<Folder>> GetAllFoldersAsync(int userId);
+        Task<Folder> CreateFolderAsync(string name, int userId, int? parentFolderId, IEnumerable<string> tags);
         Task<(Folder RootFolder, IEnumerable<Domain.Entities.File> Files)> UploadFolderAsync(
         IFormFileCollection files,
+        int userId,
         int? parentFolderId,
         IEnumerable<string> tags);
-        Task<bool> DeleteFolderAsync(int id);
-        Task<Folder> RenameFolderAsync(int id, string newName);
-        Task<IEnumerable<Folder>> GetChildFoldersAsync(int parentId);
-        Task<IEnumerable<FolderTreeDTO>> GetFolderTreeAsync();
-        Task<Folder> ToggleFavoriteAsync(int folderId);
-        Task<IEnumerable<Folder>> GetFavoriteFoldersAsync();
+        Task<bool> DeleteFolderAsync(int id, int userId);
+        Task<Folder> RenameFolderAsync(int id, string newName, int userId);
+        Task<IEnumerable<Folder>> GetChildFoldersAsync(int parentId, int userId);
+        Task<IEnumerable<FolderTreeDTO>> GetFolderTreeAsync(int userId);
+        Task<Folder> ToggleFavoriteAsync(int folderId, int userId);
+        Task<IEnumerable<Folder>> GetFavoriteFoldersAsync(int userId);
     }
 }

@@ -33,7 +33,8 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                var folders = await _unitOfWork.Folders.GetAllAsync();
+                var userId = GetCurrentUserId();
+                var folders = await _unitOfWork.Folders.GetAllAsync(userId);
                 var folderDtos = folders.Select(f => new FolderDTO
                 {
                     Id = f.Id,
@@ -60,11 +61,13 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
+                var userId = GetCurrentUserId();
                 if (string.IsNullOrWhiteSpace(createFolderDto.Name))
                     return BadRequest("Folder name cannot be empty.");
 
                 var folder = await _folderService.CreateFolderAsync(
                     createFolderDto.Name,
+                    userId: userId,
                     createFolderDto.ParentFolderId,
                     createFolderDto.Tags
                 );
@@ -94,11 +97,14 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
+                var userId = GetCurrentUserId();
+
                 if (uploadDto.Files == null || uploadDto.Files.Count == 0)
                     return BadRequest("No files were provided.");
 
                 (Folder rootFolder, IEnumerable<Domain.Entities.File> uploadedFiles) = await _folderService.UploadFolderAsync(
                     uploadDto.Files,
+                    userId,
                     uploadDto.ParentFolderId,
                     uploadDto.Tags  
                 );
@@ -127,7 +133,8 @@ namespace FileManagerApp.API.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<FolderDTO>> GetFolder(int id)
         {
-            var folder = await _unitOfWork.Folders.GetByIdAsync(id);
+            var userId = GetCurrentUserId();
+            var folder = await _unitOfWork.Folders.GetByIdAsync(id, userId);
 
             if (folder == null)
                 return NotFound($"Folder with ID {id} not found");
@@ -152,11 +159,12 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
+                var userId = GetCurrentUserId();
                 // Validate the DTO
                 if (string.IsNullOrWhiteSpace(renameDto.NewName))
                     return BadRequest("Folder name cannot be empty");
 
-                var folder = await _folderService.RenameFolderAsync(id, renameDto.NewName);
+                var folder = await _folderService.RenameFolderAsync(id, renameDto.NewName, userId);
 
                 var response = new FolderDTO
                 {
@@ -187,7 +195,8 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                var folder = await _unitOfWork.Folders.GetByIdAsync(id);
+                var userId = GetCurrentUserId();
+                var folder = await _unitOfWork.Folders.GetByIdAsync(id, userId);
                 if (folder == null)
                     return NotFound($"Folder with ID {id} not found");
 
@@ -218,7 +227,8 @@ namespace FileManagerApp.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteFolder(int id)
         {
-            var folder = await _unitOfWork.Folders.GetByIdAsync(id);
+            var userId = GetCurrentUserId();
+            var folder = await _unitOfWork.Folders.GetByIdAsync(id, userId);
 
             if (folder == null)
                 return NotFound($"Folder with ID {id} not found");
@@ -236,12 +246,13 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
+                var userId = GetCurrentUserId();
                 if (deleteDto.FolderIds == null || !deleteDto.FolderIds.Any())
                 {
                     return BadRequest("No folder IDs provided for deletion");
                 }
 
-                await _unitOfWork.Folders.BatchDeleteAsync(deleteDto.FolderIds);
+                await _unitOfWork.Folders.BatchDeleteAsync(deleteDto.FolderIds, userId);
                 await _unitOfWork.SaveChangesAsync();
 
                 return NoContent();
@@ -260,13 +271,14 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                var folder = await _unitOfWork.Folders.GetByIdAsync(id);
+                var userId = GetCurrentUserId();
+                var folder = await _unitOfWork.Folders.GetByIdAsync(id, userId);
                 if (folder == null)
                     return NotFound($"Folder with ID {id} not found");
 
                 if (moveFolderDto.NewParentFolderId.HasValue)
                 {
-                    var targetFolder = await _unitOfWork.Folders.GetByIdAsync(moveFolderDto.NewParentFolderId.Value);
+                    var targetFolder = await _unitOfWork.Folders.GetByIdAsync(moveFolderDto.NewParentFolderId.Value, userId);
                     if (targetFolder == null)
                         return BadRequest("Target parent folder not found");
 
@@ -281,7 +293,7 @@ namespace FileManagerApp.API.Controllers
                 string parentPath = "";
                 if (moveFolderDto.NewParentFolderId.HasValue)
                 {
-                    var parentFolder = await _unitOfWork.Folders.GetByIdAsync(moveFolderDto.NewParentFolderId.Value);
+                    var parentFolder = await _unitOfWork.Folders.GetByIdAsync(moveFolderDto.NewParentFolderId.Value, userId);
                     parentPath = parentFolder.Path;
                 }
                 folder.SetPath(parentPath);
@@ -300,7 +312,8 @@ namespace FileManagerApp.API.Controllers
         // Helper method to prevent circular references when moving folders
         private async Task<bool> IsFolderCircularReference(int sourceId, int targetParentId)
         {
-            var currentFolder = await _unitOfWork.Folders.GetByIdAsync(targetParentId);
+            var userId = GetCurrentUserId();
+            var currentFolder = await _unitOfWork.Folders.GetByIdAsync(targetParentId, userId);
             while (currentFolder != null)
             {
                 if (currentFolder.Id == sourceId)
@@ -309,7 +322,7 @@ namespace FileManagerApp.API.Controllers
                 if (!currentFolder.ParentFolderId.HasValue)
                     break;
 
-                currentFolder = await _unitOfWork.Folders.GetByIdAsync(currentFolder.ParentFolderId.Value);
+                currentFolder = await _unitOfWork.Folders.GetByIdAsync(currentFolder.ParentFolderId.Value, userId);
             }
             return false;
         }
@@ -319,7 +332,8 @@ namespace FileManagerApp.API.Controllers
         [HttpGet("{id}/children")]
         public async Task<ActionResult<IEnumerable<FolderDTO>>> GetChildFolders(int id)
         {
-            var childFolders = await _unitOfWork.Folders.GetChildFoldersByParentIdAsync(id);
+            var userId = GetCurrentUserId();
+            var childFolders = await _unitOfWork.Folders.GetChildFoldersByParentIdAsync(id, userId);
             var response = childFolders.Select(f => new FolderDTO
             {
                 Id = f.Id,
@@ -340,17 +354,15 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                // Get the complete folder tree from the service
-                var folderTree = await _folderService.GetFolderTreeAsync();
+                var userId = GetCurrentUserId();
+                var folderTree = await _folderService.GetFolderTreeAsync(userId);
 
-                // Log the successful retrieval
                 Console.WriteLine("Successfully retrieved folder tree structure");
 
                 return Ok(folderTree);
             }
             catch (Exception ex)
             {
-                // Log any errors that occur
                 Console.WriteLine($"Error retrieving folder tree: {ex.Message}");
                 return StatusCode(500, "An error occurred while retrieving the folder structure");
             }
@@ -363,10 +375,11 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
+                var userId = GetCurrentUserId();
                 if (string.IsNullOrWhiteSpace(searchTerm))
                     return BadRequest("Search term cannot be empty");
 
-                var folders = await _unitOfWork.Folders.SearchFoldersAsync(searchTerm);
+                var folders = await _unitOfWork.Folders.SearchFoldersAsync(searchTerm, userId);
                 var response = folders.Select(f => new FolderDTO
                 {
                     Id = f.Id,
@@ -392,7 +405,8 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                var folder = await _folderService.ToggleFavoriteAsync(id);
+                var userId = GetCurrentUserId();
+                var folder = await _folderService.ToggleFavoriteAsync(id, userId);
 
                 var response = new FolderDTO
                 {
@@ -423,7 +437,8 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                var favorites = await _folderService.GetFavoriteFoldersAsync();
+                var userId = GetCurrentUserId();
+                var favorites = await _folderService.GetFavoriteFoldersAsync(userId);
 
                 var response = favorites.Select(f => new FolderDTO
                 {

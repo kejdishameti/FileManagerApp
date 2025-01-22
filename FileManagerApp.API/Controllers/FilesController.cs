@@ -5,6 +5,7 @@ using AutoMapper;
 using FileManagerApp.API.DTO.File;
 using Microsoft.AspNetCore.Authorization;
 using FileManagerApp.Service.Interfaces;
+using FileManagerApp.Domain.Entities;
 
 namespace FileManagerApp.API.Controllers
 {
@@ -35,17 +36,16 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
+                var userId = GetCurrentUserId();
                 IEnumerable<Domain.Entities.File> files;
 
                 if (folderId.HasValue)
                 {
-                    Console.WriteLine($"Fetching files for folder: {folderId}");
-                    files = await _unitOfWork.Files.GetFilesByFolderIdAsync(folderId.Value);
+                    files = await _fileService.GetFilesByFolderIdAsync(folderId.Value, userId);
                 }
                 else
                 {
-                    Console.WriteLine("Fetching all files");
-                    files = await _unitOfWork.Files.GetAllAsync();
+                    files = await _fileService.GetAllFilesAsync(userId);
                 }
 
                 var response = files.Select(f => new FileDTO
@@ -75,7 +75,8 @@ namespace FileManagerApp.API.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<FileDTO>> GetFile(int id)
         {
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            var userId = GetCurrentUserId();
+            var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
 
             if (file == null)
                 return NotFound($"File with ID {id} not found");
@@ -101,6 +102,7 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
+                var userId = GetCurrentUserId();
                 var file = createFileDto.File;
                 Console.WriteLine($"Starting upload request - File: {file?.FileName}, FolderId: {createFileDto.FolderId}");
 
@@ -115,13 +117,14 @@ namespace FileManagerApp.API.Controllers
 
                 if (createFileDto.FolderId.HasValue)
                 {
-                    var folder = await _unitOfWork.Folders.GetByIdAsync(createFileDto.FolderId.Value);
+                    var folder = await _unitOfWork.Folders.GetByIdAsync(createFileDto.FolderId.Value, userId);
                     if (folder == null)
                         return BadRequest($"Folder with ID {createFileDto.FolderId.Value} not found");
                 }
 
                 var uploadedFile = await _fileService.UploadFileAsync(
                     file,
+                    userId: userId,
                     createFileDto.FolderId,  
                     createFileDto.Tags       
                 );
@@ -153,7 +156,8 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                var file = await _fileService.RenameFileAsync(id, renameFileDto.NewName);
+                var userId = GetCurrentUserId();
+                var file = await _fileService.RenameFileAsync(id, renameFileDto.NewName, userId);
 
                 var response = new FileDTO
                 {
@@ -185,7 +189,8 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                var file = await _unitOfWork.Files.GetByIdAsync(id);
+                var userId = GetCurrentUserId();
+                var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
                 if (file == null)
                     return NotFound($"File with ID {id} not found");
 
@@ -217,7 +222,8 @@ namespace FileManagerApp.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteFile(int id)
         {
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            var userId = GetCurrentUserId();
+            var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
 
             if (file == null)
                 return NotFound($"File with ID {id} not found");
@@ -235,12 +241,13 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
+                var userId = GetCurrentUserId();
                 if (deleteDto.FileIds == null || !deleteDto.FileIds.Any())
                 {
                     return BadRequest("No file IDs provided for deletion");
                 }
 
-                await _unitOfWork.Files.BatchDeleteAsync(deleteDto.FileIds);
+                await _unitOfWork.Files.BatchDeleteAsync(deleteDto.FileIds, userId);
                 await _unitOfWork.SaveChangesAsync();
 
                 return NoContent();
@@ -257,7 +264,8 @@ namespace FileManagerApp.API.Controllers
         [HttpGet("{id}/download")]
         public async Task<ActionResult> DownloadFile(int id)
         {
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            var userId = GetCurrentUserId();
+            var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
 
             if (file == null)
                 return NotFound($"File with ID {id} not found");
@@ -274,14 +282,15 @@ namespace FileManagerApp.API.Controllers
         [HttpPut("{id}/move")]
         public async Task<IActionResult> MoveFile(int id, [FromBody] MoveFileDTO moveFileDto)
         {
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            var userId = GetCurrentUserId();
+            var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
 
             if (file == null)
                 return NotFound($"File with ID {id} not found");
 
             if (moveFileDto.NewFolderId.HasValue)
             {
-                var targetFolder = await _unitOfWork.Folders.GetByIdAsync(moveFileDto.NewFolderId.Value);
+                var targetFolder = await _unitOfWork.Folders.GetByIdAsync(moveFileDto.NewFolderId.Value, userId);
                 if (targetFolder == null)
                     return BadRequest("Target folder not found");
             }
@@ -300,10 +309,11 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
+                var userId = GetCurrentUserId();
                 if (string.IsNullOrWhiteSpace(term))
                     return BadRequest("Search term cannot be empty");
 
-                var files = await _unitOfWork.Files.SearchFilesAsync(term);
+                var files = await _unitOfWork.Files.SearchFilesAsync(term, userId);
 
                 var response = files.Select(f => new FileDTO
                 {
@@ -330,7 +340,8 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                var copiedFile = await _fileService.CopyFileAsync(id, copyFileDto.TargetFolderId);
+                var userId = GetCurrentUserId();
+                var copiedFile = await _fileService.CopyFileAsync(id, copyFileDto.TargetFolderId, userId);
 
                 var response = new FileDTO
                 {
@@ -363,7 +374,8 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                var file = await _fileService.ToggleFavoriteAsync(id);
+                var userId = GetCurrentUserId();
+                var file = await _fileService.ToggleFavoriteAsync(id, userId);
 
                 var response = new FileDTO
                 {
@@ -396,7 +408,8 @@ namespace FileManagerApp.API.Controllers
         {
             try
             {
-                var favorites = await _fileService.GetFavoriteFilesAsync();
+                var userId = GetCurrentUserId();
+                var favorites = await _fileService.GetFavoriteFilesAsync(userId);
 
                 var response = favorites.Select(f => new FileDTO
                 {

@@ -11,8 +11,8 @@ namespace FileManagerApp.Data.Interfaces
 {
     public interface IRepository<T> where T : class
     {
-        Task<T> GetByIdAsync(int id);
-        Task<IEnumerable<T>> GetAllAsync();
+        Task<T> GetByIdAsync(int id, int userId);
+        Task<IEnumerable<T>> GetAllAsync(int userId);
         Task AddAsync(T entity);
         void Update(T entity);
         void Delete(T entity);
@@ -20,22 +20,22 @@ namespace FileManagerApp.Data.Interfaces
 
     public interface IFileRepository : IRepository<DomainFile>
     {
-        Task<IEnumerable<DomainFile>> GetFilesByFolderIdAsync(int folderId);
-        Task<DomainFile> GetFileByPathAsync(string path);
-        Task<IEnumerable<DomainFile>> SearchFilesAsync(string searchTerm);
-        Task<IEnumerable<DomainFile>> GetFilesByTagAsync(string tag);
-        Task BatchDeleteAsync(IEnumerable<int> fileIds);
-        Task<IEnumerable<DomainFile>> GetFavoriteFilesAsync();
+        Task<IEnumerable<DomainFile>> GetFilesByFolderIdAsync(int folderId, int userId);
+        Task<DomainFile> GetFileByPathAsync(string path, int userId);
+        Task<IEnumerable<DomainFile>> SearchFilesAsync(string searchTerm, int userId);
+        Task<IEnumerable<DomainFile>> GetFilesByTagAsync(string tag, int userId);
+        Task BatchDeleteAsync(IEnumerable<int> fileIds, int userId);
+        Task<IEnumerable<DomainFile>> GetFavoriteFilesAsync(int userId);
 
     }
 
     public interface IFolderRepository : IRepository<Folder>
     {
-        Task<Folder> GetFolderByPathAsync(string path);
-        Task<IEnumerable<Folder>> GetChildFoldersByParentIdAsync(int parentFolderId);
-        Task<IEnumerable<Folder>> SearchFoldersAsync(string searchTerm);
-        Task<IEnumerable<Folder>> GetFoldersByTagAsync(string tag);
-        Task BatchDeleteAsync(IEnumerable<int> folderIds);
-        Task<IEnumerable<Folder>> GetFavoriteFoldersAsync();
+        Task<Folder> GetFolderByPathAsync(string path, int userId);
+        Task<IEnumerable<Folder>> GetChildFoldersByParentIdAsync(int parentFolderId, int userId);
+        Task<IEnumerable<Folder>> SearchFoldersAsync(string searchTerm, int userId);
+        Task<IEnumerable<Folder>> GetFoldersByTagAsync(string tag, int userId);
+        Task BatchDeleteAsync(IEnumerable<int> folderIds, int userId);
+        Task<IEnumerable<Folder>> GetFavoriteFoldersAsync(int userId);
     }
 }

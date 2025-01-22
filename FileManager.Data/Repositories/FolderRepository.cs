@@ -13,14 +13,16 @@ namespace FileManagerApp.Data.Repositories
             _context = context;
         }
 
-        public async Task<Folder> GetByIdAsync(int id)
+        public async Task<Folder> GetByIdAsync(int id, int userId)
         {
             try
             {
                 return await _context.Folders
-                    .Include(f => f.Files)
-                    .Include(f => f.ChildFolders)
-                    .FirstOrDefaultAsync(f => f.Id == id && !f.IsDeleted);
+                 .Include(f => f.Files)
+                 .Include(f => f.ChildFolders)
+                 .FirstOrDefaultAsync(f => f.Id == id &&
+                                         !f.IsDeleted &&
+                                         f.UserId == userId);
             }
             catch (Exception ex)
             {
@@ -29,12 +31,12 @@ namespace FileManagerApp.Data.Repositories
             }
         }
 
-        public async Task<IEnumerable<Folder>> GetAllAsync()
+        public async Task<IEnumerable<Folder>> GetAllAsync(int userId)
         {
             try
             {
                 return await _context.Folders
-                    .Where(f => !f.IsDeleted)
+                    .Where(f => !f.IsDeleted && f.UserId == userId)
                     .OrderBy(f => f.Path)
                     .ToListAsync();
             }
@@ -94,7 +96,7 @@ namespace FileManagerApp.Data.Repositories
             }
         }
 
-        public async Task BatchDeleteAsync(IEnumerable<int> folderIds)
+        public async Task BatchDeleteAsync(IEnumerable<int> folderIds, int userId)
         {
             try
             {
@@ -103,7 +105,9 @@ namespace FileManagerApp.Data.Repositories
                     throw new ArgumentException("No folder IDs provided for deletion");
 
                 var foldersToDelete = await _context.Folders
-                    .Where(f => folderIds.Contains(f.Id) && !f.IsDeleted)
+                    .Where(f => folderIds.Contains(f.Id) &&
+                       !f.IsDeleted &&
+                       f.UserId == userId)
                     .ToListAsync();
 
                 foreach (var folder in foldersToDelete)
@@ -120,7 +124,7 @@ namespace FileManagerApp.Data.Repositories
             }
         }
 
-        public async Task<Folder> GetFolderByPathAsync(string path)
+        public async Task<Folder> GetFolderByPathAsync(string path, int userId)
         {
             try
             {
@@ -128,7 +132,9 @@ namespace FileManagerApp.Data.Repositories
                     throw new ArgumentException("Path cannot be empty", nameof(path));
 
                 return await _context.Folders
-                    .FirstOrDefaultAsync(f => f.Path == path && !f.IsDeleted);
+                     .FirstOrDefaultAsync(f => f.Path == path &&
+                                    !f.IsDeleted &&
+                                    f.UserId == userId);
             }
             catch (Exception ex)
             {
@@ -137,12 +143,14 @@ namespace FileManagerApp.Data.Repositories
             }
         }
 
-        public async Task<IEnumerable<Folder>> GetChildFoldersByParentIdAsync(int parentFolderId)
+        public async Task<IEnumerable<Folder>> GetChildFoldersByParentIdAsync(int parentFolderId, int userId)
         {
             try
             {
                 return await _context.Folders
-                    .Where(f => f.ParentFolderId == parentFolderId && !f.IsDeleted)
+                    .Where(f => f.ParentFolderId == parentFolderId &&
+                               !f.IsDeleted &&
+                               f.UserId == userId)
                     .OrderBy(f => f.Name)
                     .ToListAsync();
             }
@@ -153,7 +161,7 @@ namespace FileManagerApp.Data.Repositories
             }
         }
 
-        public async Task<IEnumerable<Folder>> SearchFoldersAsync(string searchTerm)
+        public async Task<IEnumerable<Folder>> SearchFoldersAsync(string searchTerm, int userId)
         {
             try
             {
@@ -162,19 +170,15 @@ namespace FileManagerApp.Data.Repositories
 
                 searchTerm = searchTerm.ToLower();
 
-                var folders = await _context.Folders
-                    .Where(f => !f.IsDeleted)
+                return await _context.Folders
+                    .Where(f => !f.IsDeleted &&
+                               f.UserId == userId &&
+                               (f.Name.ToLower().Contains(searchTerm) ||
+                                f.Path.ToLower().Contains(searchTerm) ||
+                                f.Tags.Any(t => t.ToLower().Contains(searchTerm))))
                     .AsNoTracking()
-                    .ToListAsync();
-
-                return folders
-                    .Where(f =>
-                        f.Name.ToLower().Contains(searchTerm) ||
-                        f.Path.ToLower().Contains(searchTerm) ||
-                        f.Tags.Any(t => t.ToLower().Contains(searchTerm)))
-                    .DistinctBy(f => f.Id)  
                     .OrderBy(f => f.Path)
-                    .ToList();
+                    .ToListAsync();
             }
             catch (Exception ex)
             {
@@ -183,19 +187,19 @@ namespace FileManagerApp.Data.Repositories
             }
         }
 
-        public async Task<IEnumerable<Folder>> GetFoldersByTagAsync(string tag)
+        public async Task<IEnumerable<Folder>> GetFoldersByTagAsync(string tag, int userId)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(tag))
                     return new List<Folder>();
 
-                // Normalize the tag for searching
                 tag = tag.Trim().ToLower();
 
-                // Find folders that have the exact tag
                 return await _context.Folders
-                    .Where(f => !f.IsDeleted && f.Tags.Contains(tag))
+                    .Where(f => !f.IsDeleted &&
+                               f.UserId == userId &&
+                               f.Tags.Contains(tag))
                     .OrderBy(f => f.Path)
                     .ToListAsync();
             }
@@ -206,12 +210,13 @@ namespace FileManagerApp.Data.Repositories
             }
         }
 
-        public async Task<IEnumerable<Folder>> GetFavoriteFoldersAsync()
+        public async Task<IEnumerable<Folder>> GetFavoriteFoldersAsync(int userId)
         {
             return await _context.Folders
-                .Where(f => !f.IsDeleted && f.IsFavorite)
+                .Where(f => !f.IsDeleted &&
+                       f.UserId == userId &&
+                       f.IsFavorite)
                 .OrderBy(f => f.Path)
-                .AsNoTracking()
                 .ToListAsync();
         }
     }

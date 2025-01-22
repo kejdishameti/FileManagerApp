@@ -31,6 +31,9 @@ namespace FileManagerApp.Domain.Entities
         private List<File> _files = new();
         public IReadOnlyCollection<File> Files => _files;
 
+        // Relationship with users
+        public int UserId { get; private set; }
+
         // New property for tags
         private List<string> _tags = new();
         public IReadOnlyCollection<string> Tags => _tags.AsReadOnly();
@@ -53,7 +56,7 @@ namespace FileManagerApp.Domain.Entities
 
         private Folder() { }
 
-        public static Folder Create(string name, int? parentFolderId = null)
+        public static Folder Create(string name, int? parentFolderId, int userId)
         {
             if (string.IsNullOrEmpty(name))
                 throw new ArgumentException("Folder must have a name");
@@ -63,7 +66,8 @@ namespace FileManagerApp.Domain.Entities
                 Name = name,
                 ParentFolderId = parentFolderId,
                 Path = "/" + name,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                UserId = userId
             };
         }
 

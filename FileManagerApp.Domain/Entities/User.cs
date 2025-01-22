@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using DomainFile = FileManagerApp.Domain.Entities.File;
 
 namespace FileManagerApp.Domain.Entities
 {
@@ -19,6 +20,9 @@ namespace FileManagerApp.Domain.Entities
         public bool IsDeleted { get; private set; }
         public DateTime? DeletedAt { get; private set; }
 
+        public virtual ICollection<DomainFile> Files { get; private set; } = new List<DomainFile>();
+        public virtual ICollection<Folder> Folders { get; private set; } = new List<Folder>();
+
         private User() { } // For EF Core
 
         public static User Create(string email, string username, string role = "User")
@@ -29,7 +33,9 @@ namespace FileManagerApp.Domain.Entities
                 Username = username?.Trim(),
                 Role = role,
                 CreatedAt = DateTime.UtcNow,
-                IsDeleted = false
+                IsDeleted = false,
+                Files = new List<DomainFile>(),
+                Folders = new List<Folder>()
             };
         }
 

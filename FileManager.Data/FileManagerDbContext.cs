@@ -38,10 +38,16 @@ namespace FileManagerApp.Data
                         v => JsonSerializer.Deserialize<List<string>>(v, new JsonSerializerOptions()) ?? new List<string>()
                     );
 
+
                 // Configure the IsFavorite property
                 entity.Property(e => e.IsFavorite)
                     .HasColumnType("boolean")
                     .HasDefaultValue(false);
+
+                entity.HasOne<User>()
+                 .WithMany(u => u.Files)
+                 .HasForeignKey(f => f.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<Folder>(entity =>
@@ -70,6 +76,11 @@ namespace FileManagerApp.Data
                 entity.Property(e => e.IsFavorite)
                     .HasColumnType("boolean")
                     .HasDefaultValue(false);
+
+                entity.HasOne<User>()
+                 .WithMany(u => u.Folders)
+                 .HasForeignKey(f => f.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
             });
 
             // Configure the User entity

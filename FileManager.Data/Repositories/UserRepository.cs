@@ -19,14 +19,14 @@ namespace FileManagerApp.Data.Repositories
             _context = context;
         }
 
-        public async Task<User> GetByIdAsync(int id)
+        public async Task<User> GetByIdAsync(int id, int userId)
         {
             
             return await _context.Users
                 .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
         }
 
-        public async Task<IEnumerable<User>> GetAllAsync()
+        public async Task<IEnumerable<User>> GetAllAsync(int userId)
         {
             
             return await _context.Users

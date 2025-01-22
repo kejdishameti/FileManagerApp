@@ -24,25 +24,33 @@ namespace FileManagerApp.Service.Implementations
                 new[] { "image/jpeg", "image/png", "application/pdf", "text/plain" };
         }
 
-        public async Task<DomainFile> GetFileByIdAsync(int id)
+        public async Task<DomainFile> GetFileByIdAsync(int id, int userId)
         {
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
             if (file == null)
                 throw new ArgumentException($"File with ID {id} not found");
             return file;
         }
 
-        public async Task<IEnumerable<DomainFile>> GetAllFilesAsync()
+        public async Task<IEnumerable<DomainFile>> GetAllFilesAsync(int userId)
         {
-            return await _unitOfWork.Files.GetAllAsync();
+            return await _unitOfWork.Files.GetAllAsync(userId);
         }
 
-        public async Task<IEnumerable<DomainFile>> GetFilesByFolderIdAsync(int folderId)
+        public async Task<IEnumerable<DomainFile>> GetFilesByFolderIdAsync(int folderId, int userId)
         {
-            return await _unitOfWork.Files.GetFilesByFolderIdAsync(folderId);
+            return await _unitOfWork.Files.GetFilesByFolderIdAsync(folderId, userId);
         }
 
-        public async Task<DomainFile> UploadFileAsync(IFormFile file, int? folderId = null, IEnumerable<string>? tags = null)
+        public async Task<IEnumerable<DomainFile>> GetFilesByTagAsync(string tag, int userId)
+        {
+            if (string.IsNullOrWhiteSpace(tag))
+                throw new ArgumentException("Tag cannot be empty");
+
+            return await _unitOfWork.Files.GetFilesByTagAsync(tag, userId);
+        }
+
+        public async Task<DomainFile> UploadFileAsync(IFormFile file, int userId, int? folderId = null, IEnumerable<string>? tags = null)
         {
             if (file == null || file.Length == 0)
                 throw new ArgumentException("No file was provided or file is empty");
@@ -55,7 +63,7 @@ namespace FileManagerApp.Service.Implementations
 
             if (folderId.HasValue)
             {
-                var folder = await _unitOfWork.Folders.GetByIdAsync(folderId.Value);
+                var folder = await _unitOfWork.Folders.GetByIdAsync(folderId.Value, userId);
                 if (folder == null)
                     throw new ArgumentException($"Folder with ID {folderId.Value} not found");
             }
@@ -75,7 +83,8 @@ namespace FileManagerApp.Service.Implementations
                     file.FileName,
                     file.ContentType,
                     file.Length,
-                    filePath
+                    filePath,
+                    userId
                 );
 
                 if (folderId.HasValue)
@@ -100,9 +109,9 @@ namespace FileManagerApp.Service.Implementations
             }
         }
 
-        public async Task<bool> DeleteFileAsync(int id)
+        public async Task<bool> DeleteFileAsync(int id, int userId)
         {
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
             if (file == null) return false;
 
             file.MarkAsDeleted();
@@ -111,9 +120,9 @@ namespace FileManagerApp.Service.Implementations
             return true;
         }
 
-        public async Task<DomainFile> UpdateFileAsync(int id, string newName, IEnumerable<string> tags)
+        public async Task<DomainFile> UpdateFileAsync(int id, string newName, IEnumerable<string> tags, int userId)
         {
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
             if (file == null)
                 throw new ArgumentException($"File with ID {id} not found");
 
@@ -128,12 +137,12 @@ namespace FileManagerApp.Service.Implementations
             return file;
         }
 
-        public async Task<DomainFile> RenameFileAsync(int id, string newName)
+        public async Task<DomainFile> RenameFileAsync(int id, string newName, int userId)
         {
             if (string.IsNullOrWhiteSpace(newName))
                 throw new ArgumentException("New file name cannot be empty");
 
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
             if (file == null)
                 throw new ArgumentException($"File with ID {id} not found");
 
@@ -144,14 +153,14 @@ namespace FileManagerApp.Service.Implementations
             return file;
         }
 
-        public async Task<bool> MoveFileAsync(int id, int? newFolderId)
+        public async Task<bool> MoveFileAsync(int id, int? newFolderId, int userId)
         {
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
             if (file == null) return false;
 
             if (newFolderId.HasValue)
             {
-                var targetFolder = await _unitOfWork.Folders.GetByIdAsync(newFolderId.Value);
+                var targetFolder = await _unitOfWork.Folders.GetByIdAsync(newFolderId.Value, userId);
                 if (targetFolder == null)
                     throw new ArgumentException($"Target folder with ID {newFolderId.Value} not found");
             }
@@ -162,9 +171,9 @@ namespace FileManagerApp.Service.Implementations
             return true;
         }
 
-        public async Task<Stream> DownloadFileAsync(int id)
+        public async Task<Stream> DownloadFileAsync(int id, int userId)
         {
-            var file = await _unitOfWork.Files.GetByIdAsync(id);
+            var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
             if (file == null)
                 throw new ArgumentException($"File with ID {id} not found");
 
@@ -174,21 +183,21 @@ namespace FileManagerApp.Service.Implementations
             return System.IO.File.OpenRead(file.StoragePath);
         }
 
-        public async Task<IEnumerable<DomainFile>> SearchFilesByTagAsync(string tag)
+        public async Task<IEnumerable<DomainFile>> SearchFilesByTagAsync(string tag, int userId)
         {
             if (string.IsNullOrWhiteSpace(tag))
                 throw new ArgumentException("Tag cannot be empty");
 
-            return await _unitOfWork.Files.GetFilesByTagAsync(tag);
+            return await _unitOfWork.Files.GetFilesByTagAsync(tag, userId);
         }
 
-        public async Task<DomainFile> CopyFileAsync(int sourceFileId, int targetFolderId)
+        public async Task<DomainFile> CopyFileAsync(int sourceFileId, int targetFolderId, int userId)
         {
-            var sourceFile = await _unitOfWork.Files.GetByIdAsync(sourceFileId);
+            var sourceFile = await _unitOfWork.Files.GetByIdAsync(sourceFileId, userId);
             if (sourceFile == null)
                 throw new ArgumentException($"File with ID {sourceFileId} not found");
 
-            var targetFolder = await _unitOfWork.Folders.GetByIdAsync(targetFolderId);
+            var targetFolder = await _unitOfWork.Folders.GetByIdAsync(targetFolderId, userId);
             if (targetFolder == null)
                 throw new ArgumentException($"Target folder with ID {targetFolderId} not found");
 
@@ -205,7 +214,8 @@ namespace FileManagerApp.Service.Implementations
                     newFileName,
                     sourceFile.ContentType,
                     new FileInfo(newFilePath).Length,
-                    newFilePath
+                    newFilePath,
+                    userId: userId
                 );
 
                 newFile.MoveToFolder(targetFolderId);
@@ -227,9 +237,9 @@ namespace FileManagerApp.Service.Implementations
             }
         }
 
-        public async Task<DomainFile> ToggleFavoriteAsync(int fileId)
+        public async Task<DomainFile> ToggleFavoriteAsync(int fileId, int userId)
         {
-            var file = await _unitOfWork.Files.GetByIdAsync(fileId);
+            var file = await _unitOfWork.Files.GetByIdAsync(fileId, userId);
             if (file == null)
                 throw new ArgumentException($"File with ID {fileId} not found");
 
@@ -240,9 +250,9 @@ namespace FileManagerApp.Service.Implementations
             return file;
         }
 
-        public async Task<IEnumerable<DomainFile>> GetFavoriteFilesAsync()
+        public async Task<IEnumerable<DomainFile>> GetFavoriteFilesAsync(int userId)
         {
-            return await _unitOfWork.Files.GetFavoriteFilesAsync();
+            return await _unitOfWork.Files.GetFavoriteFilesAsync(userId);
         }
     }
 }

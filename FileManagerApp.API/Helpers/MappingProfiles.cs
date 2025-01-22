@@ -13,12 +13,12 @@ namespace FileManagerApp.API.Helpers
                 // File mappings
                 CreateMap<DomainFile, FileDTO>();
                 CreateMap<CreateFileDTO, DomainFile>();
-                CreateMap<UpdateFileDTO, DomainFile>();
+                CreateMap<RenameFileDTO, DomainFile>();
 
                 // Folder mappings
                 CreateMap<Folder, FolderDTO>();
                 CreateMap<CreateFolderDTO, Folder>();
-                CreateMap<UpdateFolderDTO, Folder>();
+                CreateMap<RenameFolderDTO, Folder>();
             }
     }
 }
