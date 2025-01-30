@@ -18,11 +18,12 @@ namespace FileManagerApp.Data.Repositories
             try
             {
                 return await _context.Folders
-                 .Include(f => f.Files)
-                 .Include(f => f.ChildFolders)
-                 .FirstOrDefaultAsync(f => f.Id == id &&
-                                         !f.IsDeleted &&
-                                         f.UserId == userId);
+                     .Include(f => f.Files)
+                     .Include(f => f.ChildFolders)
+                     .Include(f => f.ParentFolder)
+                     .FirstOrDefaultAsync(f => f.Id == id &&
+                                             !f.IsDeleted &&
+                                             f.UserId == userId);
             }
             catch (Exception ex)
             {
@@ -86,7 +87,9 @@ namespace FileManagerApp.Data.Repositories
                 if (entity == null)
                     throw new ArgumentNullException(nameof(entity));
 
-                entity.MarkAsDeleted();
+                entity.IsDeleted = true;
+                entity.DeletedAt = DateTime.UtcNow;
+
                 _context.Folders.Update(entity);
             }
             catch (Exception ex)
@@ -100,19 +103,19 @@ namespace FileManagerApp.Data.Repositories
         {
             try
             {
-                // Validate input
                 if (folderIds == null || !folderIds.Any())
                     throw new ArgumentException("No folder IDs provided for deletion");
 
                 var foldersToDelete = await _context.Folders
                     .Where(f => folderIds.Contains(f.Id) &&
-                       !f.IsDeleted &&
-                       f.UserId == userId)
+                           !f.IsDeleted &&
+                           f.UserId == userId)
                     .ToListAsync();
 
                 foreach (var folder in foldersToDelete)
                 {
-                    folder.MarkAsDeleted();
+                    folder.IsDeleted = true;
+                    folder.DeletedAt = DateTime.UtcNow;
                 }
 
                 _context.Folders.UpdateRange(foldersToDelete);
@@ -168,14 +171,12 @@ namespace FileManagerApp.Data.Repositories
                 if (string.IsNullOrWhiteSpace(searchTerm))
                     return new List<Folder>();
 
-                searchTerm = searchTerm.ToLower();
-
                 return await _context.Folders
                     .Where(f => !f.IsDeleted &&
                                f.UserId == userId &&
-                               (f.Name.ToLower().Contains(searchTerm) ||
-                                f.Path.ToLower().Contains(searchTerm) ||
-                                f.Tags.Any(t => t.ToLower().Contains(searchTerm))))
+                               (EF.Functions.ILike(f.Name, $"%{searchTerm}%") ||
+                                EF.Functions.ILike(f.Path, $"%{searchTerm}%") ||
+                                f.Tags.Any()))
                     .AsNoTracking()
                     .OrderBy(f => f.Path)
                     .ToListAsync();

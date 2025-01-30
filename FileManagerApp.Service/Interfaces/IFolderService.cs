@@ -25,5 +25,10 @@ namespace FileManagerApp.Service.Interfaces
         Task<IEnumerable<FolderTreeDTO>> GetFolderTreeAsync(int userId);
         Task<Folder> ToggleFavoriteAsync(int folderId, int userId);
         Task<IEnumerable<Folder>> GetFavoriteFoldersAsync(int userId);
+        Task<Folder> UpdateTagsAsync(int id, IEnumerable<string> tags, int userId);
+        Task BatchDeleteFoldersAsync(IEnumerable<int> folderIds, int userId);
+        Task<Folder> MoveFolderAsync(int id, int? newParentFolderId, int userId);
+        Task<IEnumerable<Folder>> SearchFoldersAsync(string searchTerm, int userId);
+        Task<bool> CheckCircularReferenceAsync(int sourceId, int targetParentId, int userId);
     }
 }

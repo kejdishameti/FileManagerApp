@@ -14,7 +14,6 @@ namespace FileManagerApp.Data.UnitOfWork
         IFolderRepository Folders { get; }
         IUserRepository Users { get; }
 
-        // Method to save changes
         Task<int> SaveChangesAsync();
     }
 }

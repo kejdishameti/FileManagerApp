@@ -9,6 +9,7 @@ using FileManagerApp.Service.Interfaces;
 using FileManagerApp.Service.DTOs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using FileManagerApp.Domain.Enums;
 
 namespace FileManagerApp.Service.Implementations
 {
@@ -52,10 +53,15 @@ namespace FileManagerApp.Service.Implementations
                 parentPath = parentFolder.Path;
             }
 
-            var folder = Folder.Create(name, parentFolderId, userId);
-            folder.SetPath(parentPath);
-
-            folder.UpdateTags(tags ?? new List<string>());
+            var folder = new Folder
+            {
+                Name = name,
+                ParentFolderId = parentFolderId,
+                Path = string.IsNullOrEmpty(parentPath) ? "/" + name : parentPath + "/" + name,
+                CreatedAt = DateTime.UtcNow,
+                UserId = userId,
+                Tags = tags?.ToList() ?? new List<string>()
+            };
 
             await _unitOfWork.Folders.AddAsync(folder);
             await _unitOfWork.SaveChangesAsync();
@@ -71,9 +77,7 @@ namespace FileManagerApp.Service.Implementations
         {
             var firstFile = files.FirstOrDefault() ??
                 throw new ArgumentException("No files were provided in the upload");
-
             var rootFolderName = firstFile.FileName.Split('/', '\\')[0];
-
             if (string.IsNullOrWhiteSpace(rootFolderName))
                 throw new ArgumentException("Could not determine folder name from upload");
 
@@ -87,13 +91,11 @@ namespace FileManagerApp.Service.Implementations
                 {
                     var relativePath = file.FileName.Replace("\\", "/");
                     var pathParts = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
                     var currentParentId = rootFolder.Id;
 
-                    for (int i = 1; i < pathParts.Length - 1; i++) 
+                    for (int i = 1; i < pathParts.Length - 1; i++)
                     {
                         var subFolderPath = string.Join("/", pathParts.Take(i + 1));
-
                         if (!createdFolderPaths.Contains(subFolderPath))
                         {
                             var subFolder = await CreateFolderAsync(
@@ -101,7 +103,6 @@ namespace FileManagerApp.Service.Implementations
                                 userId,
                                 currentParentId,
                                 new List<string>());
-
                             createdFolderPaths.Add(subFolderPath);
                             currentParentId = subFolder.Id;
                         }
@@ -109,21 +110,22 @@ namespace FileManagerApp.Service.Implementations
 
                     string uniqueFileName = $"{Guid.NewGuid()}_{pathParts.Last()}";
                     string filePath = Path.Combine(_storageBasePath, uniqueFileName);
-
                     using (var stream = new FileStream(filePath, FileMode.Create))
                     {
                         await file.CopyToAsync(stream);
                     }
 
-                    var fileEntity = Domain.Entities.File.Create(
-                        pathParts.Last(), 
-                        file.ContentType,
-                        file.Length,
-                        filePath,
-                        userId
-                    );
-
-                    fileEntity.MoveToFolder(currentParentId);
+                    var fileEntity = new Domain.Entities.File
+                    {
+                        Name = pathParts.Last(),
+                        ContentType = file.ContentType,
+                        SizeInBytes = file.Length,
+                        StoragePath = filePath,
+                        CreatedAt = DateTime.UtcNow,
+                        UserId = userId,
+                        FolderId = currentParentId,
+                        Status = FileStatus.Active
+                    };
 
                     await _unitOfWork.Files.AddAsync(fileEntity);
                     uploadedFiles.Add(fileEntity);
@@ -143,10 +145,21 @@ namespace FileManagerApp.Service.Implementations
             var folder = await _unitOfWork.Folders.GetByIdAsync(id, userId);
             if (folder == null) return false;
 
-            folder.MarkAsDeleted();
+            folder.IsDeleted = true;
+            folder.DeletedAt = DateTime.UtcNow;
+
             _unitOfWork.Folders.Update(folder);
             await _unitOfWork.SaveChangesAsync();
             return true;
+        }
+
+        public async Task BatchDeleteFoldersAsync(IEnumerable<int> folderIds, int userId)
+        {
+            if (folderIds == null || !folderIds.Any())
+                throw new ArgumentException("No folder IDs provided for deletion");
+
+            await _unitOfWork.Folders.BatchDeleteAsync(folderIds, userId);
+            await _unitOfWork.SaveChangesAsync();
         }
 
         public async Task<Folder> RenameFolderAsync(int id, string newName, int userId)
@@ -158,13 +171,112 @@ namespace FileManagerApp.Service.Implementations
             if (folder == null)
                 throw new ArgumentException($"Folder with ID {id} not found");
 
-            var updatedFolder = Folder.Create(newName, folder.ParentFolderId, userId:folder.UserId);
-            updatedFolder.SetPath(folder.ParentFolder?.Path ?? "");
+            var oldPath = folder.Path;
 
-            _unitOfWork.Folders.Update(updatedFolder);
+            folder.Name = newName;
+
+            var parentPath = folder.ParentFolder?.Path ?? "";
+            folder.Path = string.IsNullOrEmpty(parentPath) ? "/" + newName : parentPath + "/" + newName;
+
+            await UpdateChildFolderPathsAsync(folder, oldPath, folder.Path);
+
+            folder.ModifiedAt = DateTime.UtcNow;
+
+            _unitOfWork.Folders.Update(folder);
             await _unitOfWork.SaveChangesAsync();
 
-            return updatedFolder;
+            return folder;
+        }
+
+        private async Task UpdateChildFolderPathsAsync(Folder folder, string oldPath, string newPath)
+        {
+            var childFolders = await _unitOfWork.Folders.GetChildFoldersByParentIdAsync(folder.Id, folder.UserId);
+
+            if (!childFolders.Any())
+                return;
+
+            foreach (var childFolder in childFolders)
+            {
+                childFolder.Path = childFolder.Path.Replace(oldPath, newPath);
+
+                await UpdateChildFolderPathsAsync(childFolder, oldPath, newPath);
+
+                _unitOfWork.Folders.Update(childFolder);
+            }
+        }
+
+        public async Task<IEnumerable<Folder>> SearchFoldersAsync(string searchTerm, int userId)
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+                throw new ArgumentException("Search term cannot be empty");
+
+            return await _unitOfWork.Folders.SearchFoldersAsync(searchTerm, userId);
+        }
+
+        public async Task<Folder> UpdateTagsAsync(int id, IEnumerable<string> tags, int userId)
+        {
+            var folder = await _unitOfWork.Folders.GetByIdAsync(id, userId);
+            if (folder == null)
+                throw new ArgumentException($"Folder with ID {id} not found");
+
+            folder.Tags = tags?.ToList() ?? new List<string>();
+            folder.ModifiedAt = DateTime.UtcNow;
+
+            _unitOfWork.Folders.Update(folder);
+            await _unitOfWork.SaveChangesAsync();
+
+            return folder;
+        }
+
+        public async Task<bool> CheckCircularReferenceAsync(int sourceId, int targetParentId, int userId)
+        {
+            var currentFolder = await _unitOfWork.Folders.GetByIdAsync(targetParentId, userId);
+
+            while (currentFolder != null)
+            {
+                if (currentFolder.Id == sourceId)
+                    return true;
+
+                if (!currentFolder.ParentFolderId.HasValue)
+                    break;
+
+                currentFolder = await _unitOfWork.Folders.GetByIdAsync(currentFolder.ParentFolderId.Value, userId);
+            }
+
+            return false;
+        }
+
+        public async Task<Folder> MoveFolderAsync(int id, int? newParentFolderId, int userId)
+        {
+            var folder = await _unitOfWork.Folders.GetByIdAsync(id, userId);
+            if (folder == null)
+                throw new ArgumentException($"Folder with ID {id} not found");
+
+            if (newParentFolderId.HasValue)
+            {
+                var targetFolder = await _unitOfWork.Folders.GetByIdAsync(newParentFolderId.Value, userId);
+                if (targetFolder == null)
+                    throw new ArgumentException("Target parent folder not found");
+
+                if (await CheckCircularReferenceAsync(id, newParentFolderId.Value, userId))
+                    throw new ArgumentException("Cannot move a folder into itself or its children");
+            }
+
+            folder.ParentFolderId = newParentFolderId;
+            folder.ModifiedAt = DateTime.UtcNow;
+
+            string parentPath = "";
+            if (newParentFolderId.HasValue)
+            {
+                var parentFolder = await _unitOfWork.Folders.GetByIdAsync(newParentFolderId.Value, userId);
+                parentPath = parentFolder.Path;
+            }
+            folder.Path = string.IsNullOrEmpty(parentPath) ? "/" + folder.Name : parentPath + "/" + folder.Name;
+
+            _unitOfWork.Folders.Update(folder);
+            await _unitOfWork.SaveChangesAsync();
+
+            return folder;
         }
 
         public async Task<IEnumerable<Folder>> GetChildFoldersAsync(int parentId, int userId)
@@ -178,10 +290,8 @@ namespace FileManagerApp.Service.Implementations
             {
                 var allFolders = (await _unitOfWork.Folders.GetAllAsync(userId)).ToList();
 
-                // Find root folders (those without parents)
                 var rootFolders = allFolders.Where(f => !f.ParentFolderId.HasValue).ToList();
 
-                // Build tree structure starting from root folders
                 var tree = rootFolders.Select(folder => BuildFolderTreeDTO(folder, allFolders)).ToList();
 
                 return tree;
@@ -213,13 +323,15 @@ namespace FileManagerApp.Service.Implementations
             return dto;
         }
 
-        public async Task<Folder> ToggleFavoriteAsync(int folderId, int userId)
+        public async Task<Folder> ToggleFavoriteAsync(int id, int userId)
         {
-            var folder = await _unitOfWork.Folders.GetByIdAsync(folderId, userId);
+            var folder = await _unitOfWork.Folders.GetByIdAsync(id, userId);
             if (folder == null)
-                throw new ArgumentException($"Folder with ID {folderId} not found");
+                throw new ArgumentException($"Folder with ID {id} not found");
 
-            folder.ToggleFavorite();
+            folder.IsFavorite = !folder.IsFavorite;
+            folder.ModifiedAt = DateTime.UtcNow;
+
             _unitOfWork.Folders.Update(folder);
             await _unitOfWork.SaveChangesAsync();
 
@@ -229,6 +341,22 @@ namespace FileManagerApp.Service.Implementations
         public async Task<IEnumerable<Folder>> GetFavoriteFoldersAsync(int userId)
         {
             return await _unitOfWork.Folders.GetFavoriteFoldersAsync(userId);
+        }
+
+        private async Task<bool> IsFolderCircularReference(int sourceId, int targetParentId)
+        {
+            var currentFolder = await _unitOfWork.Folders.GetByIdAsync(targetParentId, userId: 0); 
+            while (currentFolder != null)
+            {
+                if (currentFolder.Id == sourceId)
+                    return true;
+
+                if (!currentFolder.ParentFolderId.HasValue)
+                    break;
+
+                currentFolder = await _unitOfWork.Folders.GetByIdAsync(currentFolder.ParentFolderId.Value, userId: 0);
+            }
+            return false;
         }
     }
 }

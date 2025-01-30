@@ -1,6 +1,7 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.AspNetCore.Http;
+using System.ComponentModel.DataAnnotations;
 
-namespace FileManagerApp.API.DTO.File
+namespace FileManagerApp.Service.DTOs.File
 {
     public class CreateFileDTO
     {

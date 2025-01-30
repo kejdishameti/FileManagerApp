@@ -1,4 +1,6 @@
-﻿namespace FileManagerApp.API.DTO.File
+﻿using Microsoft.Extensions.Configuration.UserSecrets;
+
+namespace FileManagerApp.API.DTO.File
 {
     public class FileDTO
     {
@@ -11,5 +13,6 @@
         public int? FolderId { get; set; }
         public IEnumerable<string> Tags { get; set; } = new List<string>();
         public bool IsFavorite { get; set; }
+        public int UserId { get; set;}
     }
 }

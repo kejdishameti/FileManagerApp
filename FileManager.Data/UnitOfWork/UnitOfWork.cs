@@ -32,7 +32,6 @@ namespace FileManagerApp.Data.UnitOfWork
         public IUserRepository Users =>
             _usersRepository ??= new UserRepository(_context);
 
-        // Existing SaveChanges and Dispose methods remain the same
         public async Task<int> SaveChangesAsync()
         {
             try

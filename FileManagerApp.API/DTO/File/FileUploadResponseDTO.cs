@@ -9,6 +9,7 @@
         public int? FolderId { get; set; }
         public long SizeInBytes { get; set; }
         public IEnumerable<string> Tags { get; set; } = new List<string>();
+        public int UserId { get; set; }
 
     }
 }
