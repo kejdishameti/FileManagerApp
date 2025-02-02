@@ -27,7 +27,7 @@ namespace FileManagerApp.Data.Interfaces
         Task<DomainFile> UpdateTagsAsync(int id, IEnumerable<string> tags, int userId);
         Task BatchDeleteAsync(IEnumerable<int> fileIds, int userId);
         Task<IEnumerable<DomainFile>> GetFavoriteFilesAsync(int userId);
-
+        Task<(byte[] FileData, string ContentType)?> GetPreviewAsync(int id, int userId);
     }
 
     public interface IFolderRepository : IRepository<Folder>

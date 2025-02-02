@@ -15,6 +15,13 @@ namespace FileManagerApp.Service.Implementations
         private readonly IUnitOfWork _unitOfWork;
         private readonly IConfiguration _configuration;
         private readonly string _storageBasePath;
+        private readonly string[] PreviewableTypes = new[]
+   {
+        "image/jpeg",
+        "image/png",
+        "text/plain",
+        "application/pdf"
+    };
 
         public FileService(IUnitOfWork unitOfWork, IConfiguration configuration)
         {
@@ -278,6 +285,12 @@ namespace FileManagerApp.Service.Implementations
 
             await _unitOfWork.SaveChangesAsync();
             return file;
+        }
+
+
+        public async Task<(byte[] FileData, string ContentType)?> GetPreviewAsync(int id, int userId)
+        {
+            return await _unitOfWork.Files.GetPreviewAsync(id, userId);
         }
 
         private void ValidateFileUpload(IFormFile file)

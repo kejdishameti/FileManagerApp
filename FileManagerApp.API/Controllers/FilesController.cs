@@ -158,10 +158,24 @@ namespace FileManagerApp.API.Controllers
         [HttpGet("favorites")]
         public async Task<ActionResult<IEnumerable<FileDTO>>> GetFavorites()
         {
-var userId = GetCurrentUserId();
-                var files = await _fileService.GetFavoriteFilesAsync(userId);
-                var response = _mapper.Map<IEnumerable<FileDTO>>(files);
-                return Ok(response);
+            var userId = GetCurrentUserId();
+            var files = await _fileService.GetFavoriteFilesAsync(userId);
+            var response = _mapper.Map<IEnumerable<FileDTO>>(files);
+            return Ok(response);
+        }
+
+        // GET: api/files/{id}/preview
+        // Retrieves a preview of the file
+        [HttpGet("{id}/preview")]
+        public async Task<IActionResult> GetPreview(int id)
+        {
+            var userId = GetCurrentUserId();
+            var preview = await _fileService.GetPreviewAsync(id, userId);
+            
+            if (preview == null)
+                return NotFound();
+
+            return File(preview.Value.FileData, preview.Value.ContentType);
         }
     }
 }

@@ -24,5 +24,6 @@ namespace FileManagerApp.Service.Interfaces
         Task<DomainFile> ToggleFavoriteAsync(int id, int userId);
         Task<IEnumerable<DomainFile>> GetFavoriteFilesAsync(int userId);
         Task<DomainFile> UpdateFileTagsAsync(int id, IEnumerable<string> tags, int userId);
+        Task<(byte[] FileData, string ContentType)?> GetPreviewAsync(int id, int userId);
     }
 }

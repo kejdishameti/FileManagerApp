@@ -57,7 +57,7 @@ namespace FileManagerApp.Data.Repositories
                 .Where(f => !f.IsDeleted &&
                            f.UserId == userId &&
                            (EF.Functions.ILike(f.Name, $"%{searchTerm}%") ||
-                            f.Tags.Any()))  
+                            f.Tags.Any()))
                 .AsNoTracking()
                 .ToListAsync();
         }
@@ -140,6 +140,21 @@ namespace FileManagerApp.Data.Repositories
                           f.IsFavorite)
                .AsNoTracking()
                .ToListAsync();
+        }
+
+        public async Task<(byte[] FileData, string ContentType)?> GetPreviewAsync(int id, int userId)
+        {
+            var file = await _context.Files
+                .AsNoTracking()  
+                .FirstOrDefaultAsync(f => f.Id == id &&
+                                        f.UserId == userId &&
+                                        !f.IsDeleted);
+
+            if (file == null || !File.Exists(file.StoragePath))
+                return null;
+
+            var fileData = await File.ReadAllBytesAsync(file.StoragePath);
+            return (fileData, file.ContentType);
         }
     }
 }
