@@ -12,6 +12,7 @@ using FileManagerApp.Service.DTOs.Auth;
 using FileManagerApp.Service.Interfaces;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 
 namespace FileManagerApp.Service.Implementations
 {
@@ -30,20 +31,28 @@ namespace FileManagerApp.Service.Implementations
 
         public async Task<UserDTO> RegisterAsync(RegisterDTO registerDto)
         {
-            // Check if email is already taken
+            // Check if email exists
             var existingUser = await _unitOfWork.Users.GetByEmailAsync(registerDto.Email);
             if (existingUser != null)
                 throw new ArgumentException("Email is already registered");
 
-            // Create new user
-            var user = User.Create(registerDto.Email, registerDto.Username);
-            user.SetPassword(registerDto.Password);
+            // Create password hash
+            using var hmac = new HMACSHA512();
+            var passwordHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(registerDto.Password));
+            var passwordSalt = hmac.Key;
 
-            // Save to database
+            // Create new user
+            var user = new User
+            {
+                Email = registerDto.Email,
+                Username = registerDto.Username,
+                PasswordHash = passwordHash,
+                PasswordSalt = passwordSalt
+            };
+
             await _unitOfWork.Users.AddAsync(user);
             await _unitOfWork.SaveChangesAsync();
 
-            // Create token and return UserDTO
             var token = await CreateTokenAsync(user);
             var userDto = _mapper.Map<UserDTO>(user);
             userDto.Token = token;
@@ -54,8 +63,14 @@ namespace FileManagerApp.Service.Implementations
         public async Task<UserDTO> LoginAsync(LoginDTO loginDto)
         {
             var user = await _unitOfWork.Users.GetByEmailAsync(loginDto.Email);
+            if (user == null)
+                throw new ArgumentException("Invalid email or password");
 
-            if (user == null || !user.VerifyPassword(loginDto.Password))
+            // Verify password
+            using var hmac = new HMACSHA512(user.PasswordSalt);
+            var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(loginDto.Password));
+
+            if (!computedHash.SequenceEqual(user.PasswordHash))
                 throw new ArgumentException("Invalid email or password");
 
             var token = await CreateTokenAsync(user);

@@ -58,7 +58,8 @@ namespace FileManagerApp.Data.Repositories
 
         public void Delete(User entity)
         {
-            entity.MarkAsDeleted();
+            entity.IsDeleted = true;
+            entity.DeletedAt = DateTime.UtcNow;
             _context.Users.Update(entity);
         }
     }
