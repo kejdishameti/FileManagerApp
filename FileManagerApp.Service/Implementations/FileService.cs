@@ -290,6 +290,13 @@ namespace FileManagerApp.Service.Implementations
 
         public async Task<(byte[] FileData, string ContentType)?> GetPreviewAsync(int id, int userId)
         {
+            var file = await _unitOfWork.Files.GetByIdAsync(id, userId);
+            if (file == null)
+                return null;
+
+            if(!PreviewableTypes.Contains(file.ContentType))
+                return null;
+
             return await _unitOfWork.Files.GetPreviewAsync(id, userId);
         }
 

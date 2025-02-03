@@ -171,6 +171,7 @@ namespace FileManagerApp.Service.Implementations
             if (folder == null)
                 throw new ArgumentException($"Folder with ID {id} not found");
 
+            // Store the old path 
             var oldPath = folder.Path;
 
             folder.Name = newName;
@@ -197,6 +198,7 @@ namespace FileManagerApp.Service.Implementations
 
             foreach (var childFolder in childFolders)
             {
+                // Replace the old path with the new path
                 childFolder.Path = childFolder.Path.Replace(oldPath, newPath);
 
                 await UpdateChildFolderPathsAsync(childFolder, oldPath, newPath);

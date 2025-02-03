@@ -22,7 +22,6 @@ namespace FileManagerApp.Data.UnitOfWork
             _context = context;
         }
 
-        // Add Users property alongside existing repositories
         public IFileRepository Files =>
             _filesRepository ??= new FileRepository(_context);
 

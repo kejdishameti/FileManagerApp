@@ -21,12 +21,16 @@ namespace FileManagerApp.Data.Repositories
                 .ToListAsync();
         }
 
-        public async Task<DomainFile> GetByIdAsync(int id, int userId)
+        public async Task<DomainFile?> GetByIdAsync(int id, int userId)
         {
-            return await _context.Files
-                .FirstOrDefaultAsync(f => f.Id == id &&
-                                        !f.IsDeleted &&
-                                        f.UserId == userId);
+            try
+            {
+            return await _context.Files.SingleOrDefaultAsync(f => f.Id == id &&!f.IsDeleted && f.UserId == userId);
+            } 
+            catch(Exception e)
+            {
+                logger.log(e.Message);
+            }
         }
 
         public async Task<IEnumerable<DomainFile>> GetFilesByFolderIdAsync(int folderId, int userId)
@@ -114,9 +118,7 @@ namespace FileManagerApp.Data.Repositories
 
         public async Task BatchDeleteAsync(IEnumerable<int> fileIds, int userId)
         {
-            if (fileIds == null || !fileIds.Any())
-                throw new ArgumentException("No file IDs provided for deletion");
-
+            
             var filesToDelete = await _context.Files
                 .Where(f => fileIds.Contains(f.Id) &&
                            !f.IsDeleted &&
